@@ -102,6 +102,128 @@ class AiVorCheck(BaseModel):
     note: str = Field(max_length=1000)
 
 
+SlabFindingKind = Literal[
+    "slab_missing_area",
+    "slab_missing_hole",
+    "slab_false_hole",
+    "slab_terrace_balcony",
+    "slab_level_drop",
+]
+
+OpeningClassKind = Literal[
+    "window",
+    "balcony_door",
+    "entry_door",
+    "fire_door",
+    "lift_door",
+    "interior_door",
+    "gate",
+    "false_gap",
+]
+
+FacadeSide = Literal["north", "south", "east", "west", "court", "unknown"]
+
+
+class AiLevelSuggestion(BaseModel):
+    """Предложение по высотам/уровням этажа со ссылкой на разрез/КР/ПЗ (кандидат до приёмки)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    floor_elevation_mm: int | None = Field(
+        default=None,
+        ge=-50_000,
+        le=500_000,
+        description="Отметка чистого пола этажа от +-0.000, мм",
+    )
+    floor_height_mm: int | None = Field(
+        default=None,
+        ge=1_500,
+        le=20_000,
+        description="Высота этажа от чистого пола до чистого пола выше, мм",
+    )
+    slab_thickness_mm: int | None = Field(
+        default=None,
+        ge=100,
+        le=1_000,
+        description="Толщина монолитной плиты перекрытия, мм",
+    )
+    floor_finish_mm: int | None = Field(
+        default=None,
+        ge=0,
+        le=1_000,
+        description="Толщина пирога пола (чистый пол минус верх плиты), мм",
+    )
+    door_height_mm: int | None = Field(
+        default=None,
+        ge=1_500,
+        le=5_000,
+        description="Типовая высота дверного проёма от чистого пола, мм",
+    )
+    window_sill_mm: int | None = Field(
+        default=None,
+        ge=0,
+        le=5_000,
+        description="Высота подоконника ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм",
+    )
+    window_head_mm: int | None = Field(
+        default=None,
+        ge=500,
+        le=10_000,
+        description="Высота верха окна ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм",
+    )
+    source_ref: str = Field(min_length=1, max_length=200)
+    evidence: str = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def verify_levels(self) -> "AiLevelSuggestion":
+        values = (
+            self.floor_elevation_mm,
+            self.floor_height_mm,
+            self.slab_thickness_mm,
+            self.floor_finish_mm,
+            self.door_height_mm,
+            self.window_sill_mm,
+            self.window_head_mm,
+        )
+        if all(value is None for value in values):
+            raise ValueError("Нужно задать хотя бы один высотный параметр")
+        if (
+            self.window_sill_mm is not None
+            and self.window_head_mm is not None
+            and self.window_head_mm <= self.window_sill_mm
+        ):
+            raise ValueError("window_head_mm должен быть больше window_sill_mm")
+        return self
+
+
+class AiSlabFinding(BaseModel):
+    """Находка по плите перекрытия, отверстиям (лифты/ЛК/шахты) и балконам/террасам."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: SlabFindingKind
+    priority: Priority
+    bbox_px: BboxPx
+    hole_id: str | None = Field(default=None, max_length=64)
+    elevation_mm: int | None = Field(default=None, ge=-50_000, le=500_000)
+    observation: str = Field(min_length=1, max_length=1000)
+    evidence: str = Field(min_length=1, max_length=1000)
+    suggested_fix: str = Field(min_length=1, max_length=1000)
+
+
+class AiOpeningClassification(BaseModel):
+    """Классификация проёма `walls.json` (окно фасада, дверь, противопожарная, ложный разрыв)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    opening_id: str = Field(min_length=1, max_length=100)
+    kind: OpeningClassKind
+    facade_side: FacadeSide | None = None
+    facade_view_key: str | None = Field(default=None, max_length=64)
+    fire_rating: str | None = Field(default=None, max_length=32)
+    evidence: str = Field(min_length=1, max_length=1000)
+
+
 class AiReviewReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -110,13 +232,27 @@ class AiReviewReport(BaseModel):
     props: list[AiPropSuggestion] = Field(max_length=60)
     vor_check: list[AiVorCheck] = Field(max_length=80)
     limitations: list[str] = Field(max_length=12)
+    # Расширение полноконтекстного аудита (обратно совместимо со старыми прогонами в БД).
+    level_suggestions: list[AiLevelSuggestion] = Field(default_factory=list, max_length=12)
+    slab_findings: list[AiSlabFinding] = Field(default_factory=list, max_length=40)
+    opening_classifications: list[AiOpeningClassification] = Field(
+        default_factory=list, max_length=400
+    )
 
     @model_validator(mode="after")
     def verify_verdict(self) -> "AiReviewReport":
-        if self.verdict == "needs_correction" and not (self.findings or self.props):
+        has_actionable = bool(
+            self.findings
+            or self.props
+            or self.slab_findings
+            or self.level_suggestions
+            or any(row.kind == "false_gap" for row in self.opening_classifications)
+        )
+        if self.verdict == "needs_correction" and not has_actionable:
             raise ValueError("Нужны находки или правки свойств")
-        if self.verdict == "ready_for_human_review" and any(
-            row.priority != "minor" for row in self.findings
+        if self.verdict == "ready_for_human_review" and (
+            any(row.priority != "minor" for row in self.findings)
+            or any(row.priority != "minor" for row in self.slab_findings)
         ):
             raise ValueError("Существенные находки требуют исправления")
         return self

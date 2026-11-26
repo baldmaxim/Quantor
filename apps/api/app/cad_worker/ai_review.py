@@ -18,7 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.cad_worker.handler import CadError, _download, _run_while_owned, _still_owned
 from app.cad_worker.mep_handler import _download_artifact
 from app.cad_worker.walls_handler import _view_frame_of, _view_zone_of
-from app.contracts.cad import MAX_COMMENT_LENGTH, MAX_REVIEWER_LENGTH, CadBboxPt, CadRemarkWrite
+from app.contracts.cad import (
+    MAX_COMMENT_LENGTH,
+    MAX_REVIEWER_LENGTH,
+    CadBboxPt,
+    CadRemarkType,
+    CadRemarkWrite,
+)
 from app.contracts.cad_ai_review import (
     AiLoopPilot,
     AiRender,
@@ -30,7 +36,7 @@ from app.contracts.cad_ai_review import (
 from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
-from app.models import AiPromptVersion, DocumentRevision, Job
+from app.models import AiPromptVersion, DocumentRevision, Job, Project
 from app.services import ai_loop, cad, cad_remarks, jobs
 from app.services.cad_walls import WALLS_JSON
 from app.storage.base import ObjectStorage
@@ -166,6 +172,15 @@ def bbox_px_to_pt(
     return (left, top, right, bottom)
 
 
+_SLAB_REMARK_TYPE: dict[str, CadRemarkType] = {
+    "slab_missing_area": "monolith",
+    "slab_missing_hole": "monolith",
+    "slab_false_hole": "monolith",
+    "slab_level_drop": "monolith",
+    "slab_terrace_balcony": "room_boundary",
+}
+
+
 def build_remarks(
     *,
     job_id: uuid.UUID,
@@ -175,7 +190,7 @@ def build_remarks(
     render: AiRender,
     dxf_sha256: str,
 ) -> list[tuple[str, CadRemarkWrite]]:
-    """Находки отчёта как замечания CAD; ключи детерминированы по заданию и номеру находки."""
+    """Находки отчёта (стены/двери и плита/террасы) как замечания CAD с детермин. ключами."""
     reviewer = f"ИИ {_ROLE_LABEL.get(role, role)} · круг {iteration}"[:MAX_REVIEWER_LENGTH]
     rows: list[tuple[str, CadRemarkWrite]] = []
     for index, finding in enumerate(report.findings):
@@ -193,6 +208,26 @@ def build_remarks(
                     reviewer=reviewer,
                     status="open",
                     bbox_pt=bbox_px_to_pt(finding.bbox_px, render.clip, render.zoom),
+                    dxf_sha256=dxf_sha256,
+                ),
+            )
+        )
+    for index, slab_finding in enumerate(report.slab_findings):
+        key = "ai-slab-" + hashlib.sha256(f"{job_id}:slab:{index}".encode()).hexdigest()[:17]
+        comment = (
+            f"[{slab_finding.priority}] [{slab_finding.kind}] {slab_finding.observation}"
+            f" — Доказательство: {slab_finding.evidence}"
+            f" — Исправить: {slab_finding.suggested_fix}"
+        )
+        rows.append(
+            (
+                key,
+                CadRemarkWrite(
+                    type=_SLAB_REMARK_TYPE.get(slab_finding.kind, "other"),
+                    comment=comment[:MAX_COMMENT_LENGTH],
+                    reviewer=reviewer,
+                    status="open",
+                    bbox_pt=bbox_px_to_pt(slab_finding.bbox_px, render.clip, render.zoom),
                     dxf_sha256=dxf_sha256,
                 ),
             )
@@ -301,6 +336,28 @@ async def _prepare(
         "view_zone": _view_zone_of(walls.payload),
     }
     (root / "manifest.json").write_bytes(cad.params_bytes(manifest))
+    project = await session.get(Project, job.project_id) if job.project_id is not None else None
+    project_context_payload: dict[str, Any] = {}
+    if project is not None:
+        from app.services import cad_project_context
+
+        try:
+            # Савепоинт: ошибка БД при сборке контекста не переводит сессию в aborted.
+            async with session.begin_nested():
+                ctx = await cad_project_context.build_project_context(
+                    session,
+                    storage,
+                    project=project,
+                    focus_revision_id=revision_id,
+                    focus_page_index=payload["page_index"],
+                    focus_view=payload["view"],
+                )
+            project_context_payload = ctx.model_dump(mode="json", by_alias=True)
+        except Exception:
+            log.warning("cad_ai_review_project_context_skipped", job_id=str(job.id), exc_info=True)
+    (root / "project_context.json").write_text(
+        json.dumps(project_context_payload, ensure_ascii=False), encoding="utf-8"
+    )
     (root / "schema.json").write_text(
         json.dumps(AiReviewReport.model_json_schema(), ensure_ascii=False), encoding="utf-8"
     )

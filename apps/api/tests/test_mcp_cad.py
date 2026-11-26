@@ -65,7 +65,13 @@ async def test_tools_list_exposes_cad_tools_with_expected_annotations() -> None:
         listed = await mcp_server.dispatch(_rpc("tools/list"), mcp_server.Caller(client))
     assert isinstance(listed, dict)
     by_name = {t["name"]: t for t in listed["result"]["tools"]}
-    for name in ("get_cad_pipeline", "get_cad_view", "get_cad_view_images", "get_cad_artifact"):
+    for name in (
+        "get_cad_pipeline",
+        "get_cad_project_context",
+        "get_cad_view",
+        "get_cad_view_images",
+        "get_cad_artifact",
+    ):
         assert name in by_name
         assert by_name[name]["annotations"]["readOnlyHint"] is True
     for name in ("add_cad_remark", "rebuild_cad_view"):
@@ -581,8 +587,135 @@ async def test_add_cad_remark_converts_bbox_px_via_render_json() -> None:
 def test_cad_walls_image_artifacts_are_allowed_in_cad_service() -> None:
     assert JobType.CAD_WALLS in cad_service.CAD_ARTIFACT_JOB_TYPES
     assert cad_service.content_type_for("views/p008_v01/plan.png") == "image/png"
-    for suffix in ("walls.json", "plan.png", "overlay.png", "render.json"):
+    assert cad_service.content_type_for("views/p008_v01/slab_overlay.png") == "image/png"
+    for suffix in ("walls.json", "plan.png", "overlay.png", "slab_overlay.png", "render.json"):
         assert cad_service.WALLS_ARTIFACT_NAME.fullmatch(f"views/p008_v01/{suffix}") is not None
+
+
+async def test_get_cad_project_context_and_slab_overlay_images() -> None:
+    png_stub = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == f"/api/v1/projects/{PROJECT_ID}/cad/project-context":
+            focus = (
+                {
+                    "view_key": f"{REVISION_ID}:7:1",
+                    "revision_id": REVISION_ID,
+                    "page_index": 7,
+                    "view": 1,
+                    "placement": {
+                        "base_z_mm": 6460,
+                        "floor_height_mm": 4080,
+                        "floor_height_known": True,
+                        "slab_thickness_mm": 220,
+                        "slab_thickness_known": True,
+                        "offset_mm": [0.0, 0.0],
+                        "rotation_deg": 0.0,
+                    },
+                    "below_label": "1 эт.",
+                    "below_z_mm": 0,
+                    "above_label": "3 эт.",
+                    "above_z_mm": 10540,
+                    "zones": [{"id": "z1", "name": "Терраса"}],
+                    "apartment_zones_count": 1,
+                    "mop_zones_count": 0,
+                    "balcony_terrace_zones_count": 1,
+                }
+                if "revision_id" in request.url.params
+                else None
+            )
+            return httpx.Response(
+                200,
+                json={
+                    "schema": "quantor.cad_project_context.v1",
+                    "project_id": PROJECT_ID,
+                    "project_name": "Капельский",
+                    "coordination": {
+                        "source": "live_building3d",
+                        "note": "Живая сетка",
+                        "coordination": {
+                            "groups": [
+                                {
+                                    "group_label": "Корпус 1",
+                                    "axes": [{"label": "1"}, {"label": "А"}],
+                                    "storeys": [{"base_z_mm": 6460}],
+                                }
+                            ]
+                        },
+                    },
+                    "views": [{"view_key": f"{REVISION_ID}:7:1"}],
+                    "sections": [{"elevation_mm": 6460, "clear_height_mm": 3760}],
+                    "kr_levels": [{"corps": "1", "floor": 2, "z_mm": 6360}],
+                    "project_slab_mm": 220,
+                    "project_slab_ref": "КР2 л. 4",
+                    "facades": [{"title": "Фасад 1-12"}],
+                    "focus_view": focus,
+                },
+            )
+        if request.url.path == (
+            f"/api/v1/projects/{PROJECT_ID}/revisions/{REVISION_ID}/cad/{WALLS_JOB_ID}"
+            "/artifacts/views/p008_v01/render.json"
+        ):
+            return httpx.Response(
+                200,
+                json={
+                    "clip": [0.0, 0.0, 1000.0, 600.0],
+                    "zoom": 2.0,
+                    "width_px": 2000,
+                    "height_px": 1200,
+                },
+            )
+        if request.url.path.endswith(("/plan.png", "/overlay.png", "/slab_overlay.png")):
+            return httpx.Response(200, content=png_stub, headers={"x-content-sha256": "b" * 64})
+        return httpx.Response(404, json={"detail": "not found"})
+
+    ctx, seen = await _call(
+        handler,
+        "get_cad_project_context",
+        {"project": PROJECT_ID, "revision_id": REVISION_ID, "page_index": 7, "view": 1},
+    )
+    assert ctx["isError"] is False
+    text = ctx["content"][0]["text"]
+    assert "live_building3d" in text and "балконы/террасы=1" in text and "КР2 л. 4" in text
+    assert seen[0].url.params["page_index"] == "7"
+
+    partial, _ = await _call(
+        handler, "get_cad_project_context", {"project": PROJECT_ID, "revision_id": REVISION_ID}
+    )
+    assert partial["isError"] is True and "вместе" in partial["content"][0]["text"]
+
+    slab_only, _ = await _call(
+        handler,
+        "get_cad_view_images",
+        {
+            "project": PROJECT_ID,
+            "revision_id": REVISION_ID,
+            "job_id": CONVERT_JOB_ID,
+            "walls_job_id": WALLS_JOB_ID,
+            "page_index": 7,
+            "view": 1,
+            "which": "slab",
+        },
+    )
+    assert slab_only["isError"] is False
+    assert [c["type"] for c in slab_only["content"]] == ["text", "image"]
+    assert "slab_overlay.png" in slab_only["content"][0]["text"]
+
+    all_imgs, _ = await _call(
+        handler,
+        "get_cad_view_images",
+        {
+            "project": PROJECT_ID,
+            "revision_id": REVISION_ID,
+            "job_id": CONVERT_JOB_ID,
+            "walls_job_id": WALLS_JOB_ID,
+            "page_index": 7,
+            "view": 1,
+            "which": "all",
+        },
+    )
+    assert all_imgs["isError"] is False
+    assert [c["type"] for c in all_imgs["content"]] == ["text", "image", "image", "image"]
 
 
 def test_convert_hints_merge_preserves_previous_and_supports_250_limit() -> None:

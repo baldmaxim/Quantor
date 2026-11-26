@@ -390,3 +390,218 @@ async def test_execute_maps_exit_codes_to_failure(
     succeed.assert_not_awaited()
     write.assert_not_awaited()
     assert fail.call_args.kwargs["error_code"]
+
+
+def test_ai_review_cli_remote_package_includes_project_context_and_slab_overlay() -> None:
+    from app.cad_worker import ai_review_cli
+
+    assert '"project_context.json"' in ai_review_cli.REMOTE
+    assert '"slab_overlay.png"' in ai_review_cli.REMOTE
+
+
+async def test_prepare_writes_project_context_and_recovers_in_savepoint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from contextlib import asynccontextmanager
+    from typing import cast
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models import AiPromptVersion, DocumentRevision, Project
+    from app.services import cad_project_context
+
+    ws_id = uuid.uuid4()
+    proj_id = uuid.uuid4()
+    rev_id = uuid.uuid4()
+    cad_job_id = uuid.uuid4()
+    walls_job_id = uuid.uuid4()
+
+    walls_job = Job(
+        id=walls_job_id,
+        workspace_id=ws_id,
+        project_id=proj_id,
+        attempt=1,
+        status=JobStatus.SUCCEEDED,
+        job_type=JobType.CAD_WALLS,
+        payload={
+            "revision_id": str(rev_id),
+            "parent_job_id": str(cad_job_id),
+            "parent_attempt": 1,
+            "view_frame": [10.0, 800.0, 35.0],
+            "cad_result": {
+                "page_index": 7,
+                "view": 1,
+                "walls_sha256": "f" * 64,
+                "dxf_sha256": DXF,
+                "generator": "cad_walls.v1.26",
+            },
+        },
+    )
+    review_job = Job(
+        id=uuid.uuid4(),
+        workspace_id=ws_id,
+        project_id=proj_id,
+        job_type=JobType.CAD_AI_REVIEW,
+        payload={
+            "walls_job_id": str(walls_job_id),
+            "walls_attempt": 1,
+            "cad_job_id": str(cad_job_id),
+            "cad_attempt": 1,
+            "revision_id": str(rev_id),
+            "page_index": 7,
+            "pdf_page": 8,
+            "view": 1,
+            "role": "corrector",
+            "iteration": 1,
+            "model": "claude-opus-5-5",
+            "sources": {"vor": "/pilot/vor.md"},
+        },
+    )
+    revision = DocumentRevision(id=rev_id, source_sha256="e" * 64)
+    project = Project(id=proj_id, workspace_id=ws_id, name="Капельский")
+    prompt = AiPromptVersion(
+        id=PROMPT_ID, role="corrector", version=1, text="Промт", status="active"
+    )
+
+    nested_entered = False
+
+    class _Session:
+        async def get(self, model: Any, obj_id: Any) -> Any:
+            if model is Job:
+                return walls_job
+            if model is DocumentRevision:
+                return revision
+            if model is Project:
+                return project
+            return None
+
+        async def scalar(self, _query: Any) -> Any:
+            return prompt
+
+        @asynccontextmanager
+        async def begin_nested(self) -> Any:
+            nonlocal nested_entered
+            nested_entered = True
+            yield
+
+    monkeypatch.setattr(ai_review, "_download", AsyncMock())
+    monkeypatch.setattr(ai_review, "_download_artifact", AsyncMock())
+    monkeypatch.setattr(
+        cad_project_context,
+        "build_project_context",
+        AsyncMock(side_effect=RuntimeError("db timeout")),
+    )
+
+    await ai_review._prepare(cast(AsyncSession, _Session()), review_job, AsyncMock(), tmp_path)
+    assert nested_entered is True
+    assert json.loads((tmp_path / "project_context.json").read_text(encoding="utf-8")) == {}
+
+
+def test_full_context_report_levels_slabs_openings_and_remarks() -> None:
+    from app.services.ai_prompts import FULL_CONTEXT_PROMPT_TEMPLATES
+
+    # Обратная совместимость: старый отчёт без новых полей валиден.
+    legacy = AiReviewReport.model_validate(_report())
+    assert legacy.level_suggestions == []
+    assert legacy.slab_findings == []
+    assert legacy.opening_classifications == []
+
+    # Валидация AiLevelSuggestion: пустые поля или head <= sill отклоняются.
+    with pytest.raises(ValidationError, match="хотя бы один высотный параметр"):
+        AiReviewReport.model_validate(
+            _report(
+                level_suggestions=[{"source_ref": "КР2 л.4", "evidence": "Нет чисел"}],
+            )
+        )
+    with pytest.raises(ValidationError, match="window_head_mm"):
+        AiReviewReport.model_validate(
+            _report(
+                level_suggestions=[
+                    {
+                        "window_sill_mm": 900,
+                        "window_head_mm": 900,
+                        "source_ref": "Фасад 1-12",
+                        "evidence": "Ошибка отметок",
+                    }
+                ],
+            )
+        )
+
+    # Существенная находка по плите блокирует ready_for_human_review.
+    slab_hole = {
+        "kind": "slab_missing_hole",
+        "priority": "major",
+        "bbox_px": [450.0, 496.0, 600.0, 574.0],
+        "observation": "Лифтовые шахты Л1-Л2 залиты плитой",
+        "evidence": "slab_overlay.png: нет выреза в зоне Л1/Л2",
+        "suggested_fix": "Добавить отверстия плиты по контуру шахт",
+    }
+    slab_terrace = {
+        "kind": "slab_terrace_balcony",
+        "priority": "minor",
+        "bbox_px": [674.0, 28.0, 845.0, 398.0],
+        "elevation_mm": 6460,
+        "observation": "Терраса 13 не вошла в плиту",
+        "evidence": "План 2 этажа, уклоны 1.5%/4.2%",
+        "suggested_fix": "Уточнить контур террасной плиты",
+    }
+    with pytest.raises(ValidationError, match="Существенные"):
+        AiReviewReport.model_validate(
+            _report(verdict="ready_for_human_review", findings=[], slab_findings=[slab_hole])
+        )
+
+    # needs_correction допускается с одними slab_findings / level_suggestions / openings.
+    rich = AiReviewReport.model_validate(
+        _report(
+            verdict="needs_correction",
+            findings=[],
+            slab_findings=[slab_hole, slab_terrace],
+            level_suggestions=[
+                {
+                    "slab_thickness_mm": 220,
+                    "floor_finish_mm": 100,
+                    "window_sill_mm": 600,
+                    "window_head_mm": 2700,
+                    "source_ref": "112025-П-КР2 л.4; Разрез 1-1",
+                    "evidence": "Плита 220 мм по КР2, чистый пол +6.460",
+                }
+            ],
+            opening_classifications=[
+                {
+                    "opening_id": "19f795ff8d15",
+                    "kind": "window",
+                    "facade_side": "south",
+                    "facade_view_key": "p31v1",
+                    "evidence": "Наружная стена южного фасада, ширина 2949 мм",
+                },
+                {
+                    "opening_id": "d-fire-1",
+                    "kind": "fire_door",
+                    "fire_rating": "EIS60",
+                    "evidence": "Выход из ЛК 02.3 с подписью 900 EIS60",
+                },
+            ],
+        )
+    )
+    remarks = build_remarks(
+        job_id=uuid.uuid4(),
+        role="corrector",
+        iteration=1,
+        report=rich,
+        render=AiRender(clip=[0.0, 0.0, 1000.0, 600.0], zoom=2.0),
+        dxf_sha256=DXF,
+    )
+    assert len(remarks) == 2
+    assert remarks[0][0].startswith("ai-slab-")
+    assert remarks[0][1].type == "monolith"
+    assert "[slab_missing_hole]" in remarks[0][1].comment
+    assert remarks[1][1].type == "room_boundary"
+    assert "[slab_terrace_balcony]" in remarks[1][1].comment
+
+    for role_name in ("corrector", "verifier"):
+        text = FULL_CONTEXT_PROMPT_TEMPLATES[role_name]
+        assert "project_context.json" in text
+        assert "slab_overlay.png" in text
+        assert "slab_findings" in text
+        assert "level_suggestions" in text
+        assert "opening_classifications" in text

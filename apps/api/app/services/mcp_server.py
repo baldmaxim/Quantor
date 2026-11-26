@@ -42,13 +42,16 @@ INSTRUCTIONS = (
     "Пакетный импорт тендерной документации: start_tender_import присылает перечень ZIP с хешами "
     "(файлы через MCP не передаются), tender_import_status показывает, что принято. "
     "Работа с результатами построения чертежей CAD (за флагом cad.export): get_cad_pipeline "
-    "показывает листы и виды проекта, get_cad_view — конструкции, итоги, высоты, диагностику и "
-    "замечания вида, get_cad_view_images — снимки plan.png и overlay.png вида с координатами "
-    "render.json, get_cad_artifact — текстовый/JSON-артефакт (scale.json, walls.json, DXF до "
-    "1 МБ), add_cad_remark — добавить замечание с рамкой bbox_pt или bbox_px (область upload), "
-    "rebuild_cad_view — перестроить конструкции или повторить PDF->DXF по открытым замечаниям "
-    "(область upload). Геометрию и величины считает только движок Quantor; одобрение вида "
-    "выполняет человек."
+    "показывает листы и виды проекта, get_cad_project_context — полный контекст объекта "
+    "(координационная сетка building_mm из выпуска базы или на лету из 3D для ВИС и Claude, "
+    "привязки видов offset/rotation/frame, высоты из разрезов АР и схем КР, фасады с окнами и "
+    "зоны/террасы фокусного вида), get_cad_view — конструкции, итоги, высоты, диагностику и "
+    "замечания вида, get_cad_view_images — снимки plan.png, overlay.png и slab_overlay.png "
+    "(плита, отверстия, уровни и координатная сетка px) с render.json, get_cad_artifact — "
+    "текстовый/JSON-артефакт (scale.json, walls.json, DXF до 1 МБ), add_cad_remark — добавить "
+    "замечание с рамкой bbox_pt или bbox_px (область upload), rebuild_cad_view — перестроить "
+    "конструкции или повторить PDF->DXF по открытым замечаниям (область upload). Геометрию и "
+    "величины считает только движок Quantor; одобрение вида выполняет человек."
 )
 UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -799,6 +802,77 @@ async def get_cad_artifact(caller: Caller, args: dict[str, Any]) -> ToolResult:
     )
 
 
+async def get_cad_project_context(caller: Caller, args: dict[str, Any]) -> ToolResult:
+    project_id, name = await resolve_project(caller, str(args.get("project", "")))
+    raw_revision = str(args.get("revision_id") or "").strip()
+    page_index = args.get("page_index")
+    view = args.get("view")
+    has_focus = (bool(raw_revision), page_index is not None, view is not None)
+    if any(has_focus) and not all(has_focus):
+        raise ToolInputError("Для фокусного вида укажите вместе revision_id, page_index и view")
+    params: dict[str, Any] = {}
+    if all(has_focus):
+        if not UUID_RE.match(raw_revision):
+            raise ToolInputError("revision_id: нужен uuid ревизии")
+        params = {
+            "revision_id": raw_revision,
+            "page_index": _require_nonneg_int(args, "page_index"),
+            "view": _require_nonneg_int(args, "view"),
+        }
+    data = await caller.get(f"/api/v1/projects/{project_id}/cad/project-context", params or None)
+    coord_block = data.get("coordination") or {}
+    coord_source = coord_block.get("source") or "empty"
+    coord = coord_block.get("coordination") or {}
+    groups = coord.get("groups") or []
+    views = data.get("views") or []
+    sections = data.get("sections") or []
+    kr_levels = data.get("kr_levels") or []
+    facades = data.get("facades") or []
+
+    lines = [f"Проектный контекст CAD «{name}» (сетка: {coord_source})."]
+    if coord_block.get("note"):
+        lines.append(str(coord_block["note"]))
+    for grp in groups:
+        axes = grp.get("axes") or []
+        storeys = grp.get("storeys") or []
+        lines.append(
+            f"  Группа «{grp.get('group_label')}»: осей {len(axes)} "
+            f"({', '.join(str(a.get('label')) for a in axes[:16])}), "
+            f"этажей {len(storeys)}."
+        )
+    slab_info = (
+        f", проектная плита={data.get('project_slab_mm')} мм ({data.get('project_slab_ref')})"
+        if data.get("project_slab_mm")
+        else ""
+    )
+    lines.append(
+        f"Видов в 3D: {len(views)}, уровней разрезов АР: {len(sections)}, "
+        f"отметок схем КР: {len(kr_levels)}, видов фасадов: {len(facades)}{slab_info}."
+    )
+    focus = data.get("focus_view")
+    if isinstance(focus, dict):
+        placement = focus.get("placement") or {}
+        h_src = (
+            "известна"
+            if placement.get("floor_height_known")
+            else placement.get("floor_height_source") or "не определена"
+        )
+        slab_src = "известна" if placement.get("slab_thickness_known") else "допущение"
+        lines.append(
+            f"Фокусный вид {focus.get('view_key')}: "
+            f"отметка={placement.get('base_z_mm')} мм, "
+            f"H={placement.get('floor_height_mm')} мм ({h_src}), "
+            f"плита={placement.get('slab_thickness_mm')} мм ({slab_src}), "
+            f"offset={placement.get('offset_mm')}, rot={placement.get('rotation_deg')}°, "
+            f"соседи: снизу={focus.get('below_label') or '-'} ({focus.get('below_z_mm')}), "
+            f"сверху={focus.get('above_label') or '-'} ({focus.get('above_z_mm')}), "
+            f"зон: {len(focus.get('zones') or [])} "
+            f"(кв={focus.get('apartment_zones_count')}, МОП={focus.get('mop_zones_count')}, "
+            f"балконы/террасы={focus.get('balcony_terrace_zones_count')})."
+        )
+    return ToolResult("\n".join(lines), data if isinstance(data, dict) else None)
+
+
 async def get_cad_view_images(caller: Caller, args: dict[str, Any]) -> ToolResult:
     project_id, name = await resolve_project(caller, str(args.get("project", "")))
     revision_id = _require_uuid(args, "revision_id")
@@ -806,8 +880,8 @@ async def get_cad_view_images(caller: Caller, args: dict[str, Any]) -> ToolResul
     page_index = _require_nonneg_int(args, "page_index")
     view = _require_nonneg_int(args, "view")
     which = str(args.get("which") or "both").strip()
-    if which not in ("both", "plan", "overlay"):
-        raise ToolInputError("which: both, plan или overlay")
+    if which not in ("both", "plan", "overlay", "slab", "all"):
+        raise ToolInputError("which: both, plan, overlay, slab или all")
     folder = _cad_view_folder(page_index, view)
     walls_job_id = await _resolve_walls_job_id(
         caller,
@@ -830,12 +904,19 @@ async def get_cad_view_images(caller: Caller, args: dict[str, Any]) -> ToolResul
             return ToolResult(
                 f"Снимки вида «{name}» (стр. {page_index}, вид {view}, walls_job={walls_job_id}) "
                 "ещё не сформированы: пересчитайте конструкции вида на новом cad-worker, "
-                "после чего появятся plan.png, overlay.png и render.json.",
+                "после чего появятся plan.png, overlay.png, slab_overlay.png и render.json.",
                 is_error=True,
             )
         raise
 
-    wanted = ("plan.png", "overlay.png") if which == "both" else (f"{which}.png",)
+    wanted_map: dict[str, tuple[str, ...]] = {
+        "both": ("plan.png", "overlay.png"),
+        "plan": ("plan.png",),
+        "overlay": ("overlay.png",),
+        "slab": ("slab_overlay.png",),
+        "all": ("plan.png", "overlay.png", "slab_overlay.png"),
+    }
+    wanted = wanted_map[which]
     images: list[tuple[str, bytes]] = []
     files_meta: list[dict[str, Any]] = []
     for filename in wanted:
@@ -870,12 +951,21 @@ async def get_cad_view_images(caller: Caller, args: dict[str, Any]) -> ToolResul
             }
         )
 
-    order_desc = (
-        "1) plan.png (исходный чертёж PDF), 2) overlay.png (наложение обводки: красные — стены "
-        "и перегородки, синие — каркасные перегородки, зелёные — перемычки дверей)"
-        if which == "both"
-        else f"{wanted[0]}"
-    )
+    order_desc_map = {
+        "both": (
+            "1) plan.png (исходный чертёж PDF), 2) overlay.png (наложение обводки: красные — стены "
+            "и перегородки, синие — каркасные перегородки, зелёные — перемычки дверей)"
+        ),
+        "all": (
+            "1) plan.png (исходный чертёж PDF), 2) overlay.png (стены/перегородки/перемычки), "
+            "3) slab_overlay.png (плита, отверстия slab_holes, уровни, проёмы и сетка px)"
+        ),
+        "slab": (
+            "slab_overlay.png (плита перекрытия синим, отверстия slab_holes красным, уровни "
+            "зелёным, проёмы и координатная сетка в пикселях с шагом 200 px)"
+        ),
+    }
+    order_desc = order_desc_map.get(which, wanted[0])
     text = (
         f"Снимки вида CAD «{name}» (стр. {page_index}, вид {view}, walls_job={walls_job_id}): "
         f"{order_desc}.\n"
@@ -1225,11 +1315,40 @@ TOOLS: dict[str, Tool] = {
             get_cad_artifact,
         ),
         Tool(
+            "get_cad_project_context",
+            "Полный контекст проекта CAD (сетка, высоты, фасады, зоны)",
+            "Единый срез проекта для ИИ-проверки, ВИС и 3D-расчётов: координационная сетка осей "
+            "и этажей building_mm (из выпуска базы или на лету из cad_building3d), привязки видов "
+            "(offset_mm, rotation_deg, frame), высоты и толщины плит из разрезов АР и схем КР, "
+            "виды фасадов с окнами и (при revision_id/page_index/view) зоны и вертикальные "
+            "соседи фокусного вида. Флаг cad.export, область read.",
+            {
+                "project": PROJECT_ARG,
+                "revision_id": {
+                    "type": "string",
+                    "description": "id ревизии фокусного вида (вместе с page_index и view)",
+                },
+                "page_index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "индекс страницы фокусного вида с 0",
+                },
+                "view": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "номер фокусного вида на странице",
+                },
+            },
+            ["project"],
+            get_cad_project_context,
+        ),
+        Tool(
             "get_cad_view_images",
-            "Снимки вида CAD (plan/overlay PNG)",
-            "Получить изображения plan.png (исходный чертёж) и overlay.png (наложение обводки "
-            "walls.json) вместе с координатами render.json (clip, zoom) в формате MCP image/png "
-            "для визуальной проверки чертежа в Gemini, Claude или Codex. Область read.",
+            "Снимки вида CAD (plan/overlay/slab PNG)",
+            "Получить изображения plan.png (исходный чертёж), overlay.png (стены/перегородки/"
+            "перемычки) и slab_overlay.png (плита, отверстия slab_holes, уровни, проёмы и "
+            "координатная сетка px) вместе с render.json (clip, zoom) в формате MCP image/png. "
+            "Область read.",
             {
                 "project": PROJECT_ARG,
                 "revision_id": {"type": "string", "description": "id ревизии документа"},
@@ -1242,9 +1361,9 @@ TOOLS: dict[str, Tool] = {
                 "view": {"type": "integer", "minimum": 0, "description": "номер вида на странице"},
                 "which": {
                     "type": "string",
-                    "enum": ["both", "plan", "overlay"],
+                    "enum": ["both", "plan", "overlay", "slab", "all"],
                     "default": "both",
-                    "description": "какие снимки вернуть: both, plan или overlay",
+                    "description": "какие снимки вернуть: both, plan, overlay, slab или all",
                 },
                 "walls_job_id": {
                     "type": "string",

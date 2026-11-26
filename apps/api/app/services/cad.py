@@ -56,9 +56,9 @@ ROUTE_ARTIFACT_NAME: Final = re.compile(
     r"views/p\d{3}_v\d{2}/(?:mep_routes\.dxf|candidate\.json|preview\.json|routes3d\.json))$"
 )
 # Артефакты задания конструкций (`cad_walls`, ADR-0038): `walls.json` и необязательные снимки
-# вида (`plan.png`, `overlay.png`, `render.json`) для визуальной проверки через MCP/ИИ.
+# вида (`plan.png`, `overlay.png`, `slab_overlay.png`, `render.json`) для проверки через MCP/ИИ.
 WALLS_ARTIFACT_NAME: Final = re.compile(
-    r"^views/p\d{3}_v\d{2}/(?:walls\.json|plan\.png|overlay\.png|render\.json)$"
+    r"^views/p\d{3}_v\d{2}/(?:walls\.json|plan\.png|overlay\.png|slab_overlay\.png|render\.json)$"
 )
 # Артефакт задания 3D DXF этажа (`cad_floor3d_dxf`, ADR-0039): один файл в каталоге вида.
 FLOOR3D_ARTIFACT_NAME: Final = re.compile(r"^views/p\d{3}_v\d{2}/floor3d\.dxf$")

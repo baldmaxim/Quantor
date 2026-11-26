@@ -263,7 +263,9 @@ def _stage2(row: _Row, pilot: AiLoopPilot, costs: dict[int, _Cost]) -> AiSheetSt
         exhausted=row.exhausted,
         last_verdict=verdict,
         verdict_stale=stale,
-        last_findings=len(last.report.findings) if last is not None else None,
+        last_findings=(
+            len(last.report.findings) + len(last.report.slab_findings) if last is not None else None
+        ),
         running=running,
         error_message=correctors[0].error_message if failed_last else None,
     )

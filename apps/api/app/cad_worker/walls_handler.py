@@ -345,9 +345,16 @@ def _collect_rendered_images(
     job_id: uuid.UUID, walls_dir: Path, folder: str
 ) -> list[dict[str, Any]]:
     rendered: list[dict[str, Any]] = []
-    for filename, is_png in (("plan.png", True), ("overlay.png", True), ("render.json", False)):
+    for filename, is_png, required in (
+        ("plan.png", True, True),
+        ("overlay.png", True, True),
+        ("slab_overlay.png", True, False),
+        ("render.json", False, True),
+    ):
         path = walls_dir / filename
         if not path.is_file() or path.is_symlink():
+            if not required:
+                continue
             log.warning("cad_walls_render_missing", job_id=str(job_id), file=filename)
             return []
         size = path.stat().st_size
@@ -355,9 +362,13 @@ def _collect_rendered_images(
             cad_service.MAX_PNG_ARTIFACT_BYTES if is_png else cad_service.MAX_JSON_ARTIFACT_BYTES
         )
         if size <= 0 or size > limit:
+            if not required:
+                continue
             log.warning("cad_walls_render_oversized", job_id=str(job_id), file=filename, size=size)
             return []
         if is_png and path.read_bytes()[: len(_PNG_MAGIC)] != _PNG_MAGIC:
+            if not required:
+                continue
             log.warning("cad_walls_render_invalid_png", job_id=str(job_id), file=filename)
             return []
         rendered.append({"name": f"{folder}/{filename}", "sha256": _sha256(path), "size": size})

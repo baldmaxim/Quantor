@@ -267,6 +267,96 @@ export type AiFinding = {
 };
 
 /**
+ * AiLevelSuggestion
+ *
+ * Предложение по высотам/уровням этажа со ссылкой на разрез/КР/ПЗ (кандидат до приёмки).
+ */
+export type AiLevelSuggestion = {
+    /**
+     * Door Height Mm
+     *
+     * Типовая высота дверного проёма от чистого пола, мм
+     */
+    door_height_mm?: number | null;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Floor Elevation Mm
+     *
+     * Отметка чистого пола этажа от +-0.000, мм
+     */
+    floor_elevation_mm?: number | null;
+    /**
+     * Floor Finish Mm
+     *
+     * Толщина пирога пола (чистый пол минус верх плиты), мм
+     */
+    floor_finish_mm?: number | null;
+    /**
+     * Floor Height Mm
+     *
+     * Высота этажа от чистого пола до чистого пола выше, мм
+     */
+    floor_height_mm?: number | null;
+    /**
+     * Slab Thickness Mm
+     *
+     * Толщина монолитной плиты перекрытия, мм
+     */
+    slab_thickness_mm?: number | null;
+    /**
+     * Source Ref
+     */
+    source_ref: string;
+    /**
+     * Window Head Mm
+     *
+     * Высота верха окна ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм
+     */
+    window_head_mm?: number | null;
+    /**
+     * Window Sill Mm
+     *
+     * Высота подоконника ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм
+     */
+    window_sill_mm?: number | null;
+};
+
+/**
+ * AiOpeningClassification
+ *
+ * Классификация проёма `walls.json` (окно фасада, дверь, противопожарная, ложный разрыв).
+ */
+export type AiOpeningClassification = {
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Facade Side
+     */
+    facade_side?: 'north' | 'south' | 'east' | 'west' | 'court' | 'unknown' | null;
+    /**
+     * Facade View Key
+     */
+    facade_view_key?: string | null;
+    /**
+     * Fire Rating
+     */
+    fire_rating?: string | null;
+    /**
+     * Kind
+     */
+    kind: 'window' | 'balcony_door' | 'entry_door' | 'fire_door' | 'lift_door' | 'interior_door' | 'gate' | 'false_gap';
+    /**
+     * Opening Id
+     */
+    opening_id: string;
+};
+
+/**
  * AiPromptCreate
  */
 export type AiPromptCreate = {
@@ -536,13 +626,25 @@ export type AiReviewReport = {
      */
     findings: Array<AiFinding>;
     /**
+     * Level Suggestions
+     */
+    level_suggestions?: Array<AiLevelSuggestion>;
+    /**
      * Limitations
      */
     limitations: Array<string>;
     /**
+     * Opening Classifications
+     */
+    opening_classifications?: Array<AiOpeningClassification>;
+    /**
      * Props
      */
     props: Array<AiPropSuggestion>;
+    /**
+     * Slab Findings
+     */
+    slab_findings?: Array<AiSlabFinding>;
     /**
      * Verdict
      */
@@ -828,6 +930,51 @@ export type AiSheetStyle = {
      * State
      */
     state: 'not_started' | 'running' | 'ok' | 'attention' | 'failed';
+};
+
+/**
+ * AiSlabFinding
+ *
+ * Находка по плите перекрытия, отверстиям (лифты/ЛК/шахты) и балконам/террасам.
+ */
+export type AiSlabFinding = {
+    /**
+     * Bbox Px
+     */
+    bbox_px: [
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Elevation Mm
+     */
+    elevation_mm?: number | null;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Hole Id
+     */
+    hole_id?: string | null;
+    /**
+     * Kind
+     */
+    kind: 'slab_missing_area' | 'slab_missing_hole' | 'slab_false_hole' | 'slab_terrace_balcony' | 'slab_level_drop';
+    /**
+     * Observation
+     */
+    observation: string;
+    /**
+     * Priority
+     */
+    priority: 'blocking' | 'major' | 'minor';
+    /**
+     * Suggested Fix
+     */
+    suggested_fix: string;
 };
 
 /**
@@ -4964,6 +5111,262 @@ export type CadProgressViewRead = {
 };
 
 /**
+ * CadProjectContextRead
+ *
+ * Полный проектный контекст CAD: сетка, этажи, высоты, фасады и фокусный вид.
+ */
+export type CadProjectContextRead = {
+    /**
+     * Building Warnings
+     */
+    building_warnings?: Array<CadBuilding3dWarningRead>;
+    coordination: CadProjectCoordinationContext;
+    /**
+     * Facades
+     */
+    facades?: Array<CadProjectFacadeView>;
+    focus_view?: CadProjectFocusView | null;
+    /**
+     * Groups
+     */
+    groups?: Array<CadBuilding3dGroupRead>;
+    /**
+     * Kr Levels
+     */
+    kr_levels?: Array<CadProjectKrLevel>;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Project Name
+     */
+    project_name: string;
+    /**
+     * Project Slab Mm
+     */
+    project_slab_mm?: number | null;
+    /**
+     * Project Slab Ref
+     */
+    project_slab_ref?: string | null;
+    /**
+     * Schema
+     */
+    schema?: 'quantor.cad_project_context.v1';
+    /**
+     * Sections
+     */
+    sections?: Array<CadProjectSectionLevel>;
+    /**
+     * Views
+     */
+    views?: Array<CadProjectViewPlacement>;
+};
+
+/**
+ * CadProjectCoordinationContext
+ *
+ * Координационная сетка осей и этажей объекта (`building_mm`).
+ *
+ * При наличии действующего выпуска базы берётся замороженный `coordination.json` выпуска;
+ * до выпуска собирается «на лету» из совмещённых этажей `cad_building3d` тем же алгоритмом
+ * `tender_base_coordination.build_coordination`, чтобы ВИС, 3D и ИИ работали в одной системе.
+ */
+export type CadProjectCoordinationContext = {
+    coordination?: ObjectBaseCoordination | null;
+    /**
+     * Note
+     */
+    note?: string | null;
+    /**
+     * Release Id
+     */
+    release_id?: string | null;
+    /**
+     * Release Number
+     */
+    release_number?: number | null;
+    /**
+     * Source
+     */
+    source: 'base_release' | 'live_building3d' | 'empty';
+};
+
+/**
+ * CadProjectFacadeView
+ *
+ * Вид фасада АР (`cad_facades`): оси, привязка и сводка окон.
+ */
+export type CadProjectFacadeView = {
+    /**
+     * Axes
+     */
+    axes?: Array<string>;
+    /**
+     * Axis From
+     */
+    axis_from?: string | null;
+    /**
+     * Axis To
+     */
+    axis_to?: string | null;
+    /**
+     * Corps
+     */
+    corps?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Scale Status
+     */
+    scale_status: string;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * View Key
+     */
+    view_key: string;
+    /**
+     * Window Count
+     */
+    window_count?: number;
+    /**
+     * Windows Sample
+     */
+    windows_sample?: Array<CadProjectFacadeWindowSample>;
+};
+
+/**
+ * CadProjectFacadeWindowSample
+ *
+ * Окно вида фасада: отметки подоконника/верха и ширина в мм.
+ */
+export type CadProjectFacadeWindowSample = {
+    /**
+     * Width Mm
+     */
+    width_mm?: number | null;
+    /**
+     * Z Bottom Mm
+     */
+    z_bottom_mm?: number | null;
+    /**
+     * Z Top Mm
+     */
+    z_top_mm?: number | null;
+};
+
+/**
+ * CadProjectFocusView
+ *
+ * Детальный контекст выбранного вида: соседи по вертикали, зоны и мостик координат.
+ */
+export type CadProjectFocusView = {
+    /**
+     * Above Label
+     */
+    above_label?: string | null;
+    /**
+     * Above Z Mm
+     */
+    above_z_mm?: number | null;
+    /**
+     * Apartment Zones Count
+     */
+    apartment_zones_count?: number;
+    /**
+     * Balcony Terrace Zones Count
+     */
+    balcony_terrace_zones_count?: number;
+    /**
+     * Below Label
+     */
+    below_label?: string | null;
+    /**
+     * Below Z Mm
+     */
+    below_z_mm?: number | null;
+    /**
+     * Coordinate Bridge
+     */
+    coordinate_bridge: string;
+    /**
+     * Mop Zones Count
+     */
+    mop_zones_count?: number;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    placement?: CadProjectViewPlacement | null;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * View Key
+     */
+    view_key: string;
+    /**
+     * Zones
+     */
+    zones?: Array<CadProjectZoneSummary>;
+};
+
+/**
+ * CadProjectKrLevel
+ *
+ * Отметка верха плиты этажа по заголовку схемы КР (`cad_project_levels`).
+ */
+export type CadProjectKrLevel = {
+    /**
+     * Corps
+     */
+    corps: string;
+    /**
+     * Floor
+     */
+    floor: number;
+    /**
+     * Ref
+     */
+    ref: string;
+    /**
+     * Source
+     */
+    source?: string;
+    /**
+     * Z Mm
+     */
+    z_mm: number;
+};
+
+/**
  * CadProjectLevelsRead
  *
  * Уровни проекта; записи нет — все поля `null`.
@@ -5004,6 +5407,70 @@ export type CadProjectLevelsWrite = {
 };
 
 /**
+ * CadProjectSectionLevel
+ *
+ * Уровень этажа из распознанного разреза АР (`cad_sections`).
+ */
+export type CadProjectSectionLevel = {
+    /**
+     * Auto Accepted
+     */
+    auto_accepted?: boolean;
+    /**
+     * Clear Height Mm
+     */
+    clear_height_mm?: number | null;
+    /**
+     * Corps
+     */
+    corps?: string | null;
+    /**
+     * Cut
+     */
+    cut?: string | null;
+    /**
+     * Elevation Mm
+     */
+    elevation_mm: number;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Floor
+     */
+    floor?: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Structure Mm
+     */
+    structure_mm?: number | null;
+    /**
+     * Upper Elevation Mm
+     */
+    upper_elevation_mm: number;
+};
+
+/**
  * CadProjectSummaryRead
  *
  * Листы последних открываемых ревизий проекта по состоянию конвейера CAD.
@@ -5040,6 +5507,174 @@ export type CadProjectSummaryRead = {
      * Sheets Total
      */
     sheets_total: number;
+};
+
+/**
+ * CadProjectViewPlacement
+ *
+ * Положение одного вида (этажа) в общей системе здания и его высоты.
+ */
+export type CadProjectViewPlacement = {
+    /**
+     * Alignment
+     */
+    alignment: 'reference' | 'axes' | 'none';
+    /**
+     * Alignment Axes
+     */
+    alignment_axes?: Array<string>;
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Corps
+     */
+    corps?: string | null;
+    /**
+     * Elevation Known
+     */
+    elevation_known: boolean;
+    /**
+     * Floor Height Known
+     */
+    floor_height_known: boolean;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number;
+    /**
+     * Floor Height Source
+     */
+    floor_height_source?: 'derived_stack' | 'default' | null;
+    /**
+     * Frame
+     */
+    frame?: Array<number> | null;
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Kind
+     */
+    kind?: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Level Zones Count
+     */
+    level_zones_count?: number;
+    /**
+     * Offset Mm
+     */
+    offset_mm: Array<number>;
+    /**
+     * Outline Source
+     */
+    outline_source: 'slab' | 'bbox';
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Rotation Deg
+     */
+    rotation_deg?: number;
+    /**
+     * Section
+     */
+    section?: string | null;
+    /**
+     * Slab Area M2
+     */
+    slab_area_m2?: number | null;
+    /**
+     * Slab Thickness Known
+     */
+    slab_thickness_known: boolean;
+    /**
+     * Slab Thickness Mm
+     */
+    slab_thickness_mm: number;
+    /**
+     * Typical Of
+     */
+    typical_of?: string | null;
+    /**
+     * View
+     */
+    view: number;
+    /**
+     * View Key
+     */
+    view_key: string;
+    /**
+     * Windows Count
+     */
+    windows_count?: number;
+};
+
+/**
+ * CadProjectZoneSummary
+ *
+ * Зона помещения на листе (`cad_zones`), включая балконы/террасы и МОП.
+ */
+export type CadProjectZoneSummary = {
+    /**
+     * Apartment No
+     */
+    apartment_no?: string | null;
+    /**
+     * Expl Area M2
+     */
+    expl_area_m2?: number | null;
+    /**
+     * Generator Area M2
+     */
+    generator_area_m2?: number | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Quality Status
+     */
+    quality_status: string;
+    /**
+     * Room Mark
+     */
+    room_mark?: string | null;
+    /**
+     * Room Type
+     */
+    room_type?: string | null;
+    /**
+     * Source
+     */
+    source: string;
 };
 
 /**
@@ -16677,6 +17312,120 @@ export type OAuthAuthorizeRedirect = {
 };
 
 /**
+ * ObjectBaseCoordination
+ *
+ * `coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм здания.
+ */
+export type ObjectBaseCoordination = {
+    /**
+     * Doubts
+     */
+    doubts: Array<string>;
+    /**
+     * Frame
+     */
+    frame: 'building_mm';
+    /**
+     * Groups
+     */
+    groups: Array<ObjectBaseCoordinationGroup>;
+    /**
+     * Schema
+     */
+    schema: 'quantor.object_base.coordination.v1';
+    /**
+     * Units
+     */
+    units: 'mm';
+};
+
+/**
+ * ObjectBaseCoordinationAxis
+ *
+ * Ось группы линией в мм системы здания: точка на оси и единичное направление.
+ */
+export type ObjectBaseCoordinationAxis = {
+    /**
+     * Direction
+     */
+    direction: [
+        number,
+        number
+    ];
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Orient
+     */
+    orient: 'vertical' | 'horizontal';
+    /**
+     * Point Mm
+     */
+    point_mm: [
+        number,
+        number
+    ];
+    /**
+     * Spread Mm
+     */
+    spread_mm: number;
+    /**
+     * Views
+     */
+    views: number;
+};
+
+/**
+ * ObjectBaseCoordinationGroup
+ */
+export type ObjectBaseCoordinationGroup = {
+    /**
+     * Axes
+     */
+    axes: Array<ObjectBaseCoordinationAxis>;
+    /**
+     * Group Key
+     */
+    group_key: string;
+    /**
+     * Group Label
+     */
+    group_label: string;
+    /**
+     * Storeys
+     */
+    storeys: Array<ObjectBaseCoordinationStorey>;
+};
+
+/**
+ * ObjectBaseCoordinationStorey
+ */
+export type ObjectBaseCoordinationStorey = {
+    /**
+     * Base Z Mm
+     */
+    base_z_mm: number;
+    /**
+     * Elevation Known
+     */
+    elevation_known?: boolean;
+    /**
+     * Floor Height Mm
+     */
+    floor_height_mm: number;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * View Keys
+     */
+    view_keys: Array<string>;
+};
+
+/**
  * OriginalPrediction
  *
  * Исходный выход модели или детерминированного экстрактора до исправлений человека.
@@ -26398,6 +27147,55 @@ export type ReadCadMepRoutes3dResponses = {
 };
 
 export type ReadCadMepRoutes3dResponse = ReadCadMepRoutes3dResponses[keyof ReadCadMepRoutes3dResponses];
+
+export type ReadCadProjectContextData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Revision Id
+         *
+         * Ревизия фокусного вида (вместе с page_index и view)
+         */
+        revision_id?: string | null;
+        /**
+         * Page Index
+         *
+         * Индекс страницы фокусного вида с 0
+         */
+        page_index?: number | null;
+        /**
+         * View
+         *
+         * Номер фокусного вида на странице
+         */
+        view?: number | null;
+    };
+    url: '/api/v1/projects/{project_id}/cad/project-context';
+};
+
+export type ReadCadProjectContextErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadProjectContextError = ReadCadProjectContextErrors[keyof ReadCadProjectContextErrors];
+
+export type ReadCadProjectContextResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadProjectContextRead;
+};
+
+export type ReadCadProjectContextResponse = ReadCadProjectContextResponses[keyof ReadCadProjectContextResponses];
 
 export type ReadCadQueueData = {
     body?: never;

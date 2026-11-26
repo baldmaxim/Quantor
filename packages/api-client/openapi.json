@@ -503,6 +503,210 @@
         "title": "AiFinding",
         "type": "object"
       },
+      "AiLevelSuggestion": {
+        "additionalProperties": false,
+        "description": "Предложение по высотам/уровням этажа со ссылкой на разрез/КР/ПЗ (кандидат до приёмки).",
+        "properties": {
+          "door_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 1500.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Типовая высота дверного проёма от чистого пола, мм",
+            "title": "Door Height Mm"
+          },
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "floor_elevation_mm": {
+            "anyOf": [
+              {
+                "maximum": 500000.0,
+                "minimum": -50000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Отметка чистого пола этажа от +-0.000, мм",
+            "title": "Floor Elevation Mm"
+          },
+          "floor_finish_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина пирога пола (чистый пол минус верх плиты), мм",
+            "title": "Floor Finish Mm"
+          },
+          "floor_height_mm": {
+            "anyOf": [
+              {
+                "maximum": 20000.0,
+                "minimum": 1500.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота этажа от чистого пола до чистого пола выше, мм",
+            "title": "Floor Height Mm"
+          },
+          "slab_thickness_mm": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Толщина монолитной плиты перекрытия, мм",
+            "title": "Slab Thickness Mm"
+          },
+          "source_ref": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "window_head_mm": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 500.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота верха окна ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм",
+            "title": "Window Head Mm"
+          },
+          "window_sill_mm": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Высота подоконника ОТ ЧИСТОГО ПОЛА этажа (не абсолютная отметка), мм",
+            "title": "Window Sill Mm"
+          }
+        },
+        "required": [
+          "source_ref",
+          "evidence"
+        ],
+        "title": "AiLevelSuggestion",
+        "type": "object"
+      },
+      "AiOpeningClassification": {
+        "additionalProperties": false,
+        "description": "Классификация проёма `walls.json` (окно фасада, дверь, противопожарная, ложный разрыв).",
+        "properties": {
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "facade_side": {
+            "anyOf": [
+              {
+                "enum": [
+                  "north",
+                  "south",
+                  "east",
+                  "west",
+                  "court",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade Side"
+          },
+          "facade_view_key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facade View Key"
+          },
+          "fire_rating": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fire Rating"
+          },
+          "kind": {
+            "enum": [
+              "window",
+              "balcony_door",
+              "entry_door",
+              "fire_door",
+              "lift_door",
+              "interior_door",
+              "gate",
+              "false_gap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "opening_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Opening Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opening_id",
+          "kind",
+          "evidence"
+        ],
+        "title": "AiOpeningClassification",
+        "type": "object"
+      },
       "AiPromptCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1017,6 +1221,14 @@
             "title": "Findings",
             "type": "array"
           },
+          "level_suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/AiLevelSuggestion"
+            },
+            "maxItems": 12,
+            "title": "Level Suggestions",
+            "type": "array"
+          },
           "limitations": {
             "items": {
               "type": "string"
@@ -1025,12 +1237,28 @@
             "title": "Limitations",
             "type": "array"
           },
+          "opening_classifications": {
+            "items": {
+              "$ref": "#/components/schemas/AiOpeningClassification"
+            },
+            "maxItems": 400,
+            "title": "Opening Classifications",
+            "type": "array"
+          },
           "props": {
             "items": {
               "$ref": "#/components/schemas/AiPropSuggestion"
             },
             "maxItems": 60,
             "title": "Props",
+            "type": "array"
+          },
+          "slab_findings": {
+            "items": {
+              "$ref": "#/components/schemas/AiSlabFinding"
+            },
+            "maxItems": 40,
+            "title": "Slab Findings",
             "type": "array"
           },
           "verdict": {
@@ -1559,6 +1787,94 @@
           "state"
         ],
         "title": "AiSheetStyle",
+        "type": "object"
+      },
+      "AiSlabFinding": {
+        "additionalProperties": false,
+        "description": "Находка по плите перекрытия, отверстиям (лифты/ЛК/шахты) и балконам/террасам.",
+        "properties": {
+          "bbox_px": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox Px",
+            "type": "array"
+          },
+          "elevation_mm": {
+            "anyOf": [
+              {
+                "maximum": 500000.0,
+                "minimum": -50000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elevation Mm"
+          },
+          "evidence": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "hole_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hole Id"
+          },
+          "kind": {
+            "enum": [
+              "slab_missing_area",
+              "slab_missing_hole",
+              "slab_false_hole",
+              "slab_terrace_balcony",
+              "slab_level_drop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "observation": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Observation",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "blocking",
+              "major",
+              "minor"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "suggested_fix": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Suggested Fix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "priority",
+          "bbox_px",
+          "observation",
+          "evidence",
+          "suggested_fix"
+        ],
+        "title": "AiSlabFinding",
         "type": "object"
       },
       "AiSourceCopy": {
@@ -10292,6 +10608,467 @@
         "title": "CadProgressViewRead",
         "type": "object"
       },
+      "CadProjectContextRead": {
+        "description": "Полный проектный контекст CAD: сетка, этажи, высоты, фасады и фокусный вид.",
+        "properties": {
+          "building_warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dWarningRead"
+            },
+            "title": "Building Warnings",
+            "type": "array"
+          },
+          "coordination": {
+            "$ref": "#/components/schemas/CadProjectCoordinationContext"
+          },
+          "facades": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectFacadeView"
+            },
+            "title": "Facades",
+            "type": "array"
+          },
+          "focus_view": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadProjectFocusView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CadBuilding3dGroupRead"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "kr_levels": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectKrLevel"
+            },
+            "title": "Kr Levels",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string"
+          },
+          "project_slab_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Slab Mm"
+          },
+          "project_slab_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Slab Ref"
+          },
+          "schema": {
+            "const": "quantor.cad_project_context.v1",
+            "default": "quantor.cad_project_context.v1",
+            "title": "Schema",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectSectionLevel"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectViewPlacement"
+            },
+            "title": "Views",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project_id",
+          "project_name",
+          "coordination"
+        ],
+        "title": "CadProjectContextRead",
+        "type": "object"
+      },
+      "CadProjectCoordinationContext": {
+        "description": "Координационная сетка осей и этажей объекта (`building_mm`).\n\nПри наличии действующего выпуска базы берётся замороженный `coordination.json` выпуска;\nдо выпуска собирается «на лету» из совмещённых этажей `cad_building3d` тем же алгоритмом\n`tender_base_coordination.build_coordination`, чтобы ВИС, 3D и ИИ работали в одной системе.",
+        "properties": {
+          "coordination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectBaseCoordination"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "release_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Id"
+          },
+          "release_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Number"
+          },
+          "source": {
+            "enum": [
+              "base_release",
+              "live_building3d",
+              "empty"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "CadProjectCoordinationContext",
+        "type": "object"
+      },
+      "CadProjectFacadeView": {
+        "description": "Вид фасада АР (`cad_facades`): оси, привязка и сводка окон.",
+        "properties": {
+          "axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Axes",
+            "type": "array"
+          },
+          "axis_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis From"
+          },
+          "axis_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axis To"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "scale_status": {
+            "title": "Scale Status",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          },
+          "window_count": {
+            "default": 0,
+            "title": "Window Count",
+            "type": "integer"
+          },
+          "windows_sample": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectFacadeWindowSample"
+            },
+            "title": "Windows Sample",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "page_index",
+          "view_key",
+          "title",
+          "status",
+          "scale_status"
+        ],
+        "title": "CadProjectFacadeView",
+        "type": "object"
+      },
+      "CadProjectFacadeWindowSample": {
+        "description": "Окно вида фасада: отметки подоконника/верха и ширина в мм.",
+        "properties": {
+          "width_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Mm"
+          },
+          "z_bottom_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Bottom Mm"
+          },
+          "z_top_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Top Mm"
+          }
+        },
+        "title": "CadProjectFacadeWindowSample",
+        "type": "object"
+      },
+      "CadProjectFocusView": {
+        "description": "Детальный контекст выбранного вида: соседи по вертикали, зоны и мостик координат.",
+        "properties": {
+          "above_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Above Label"
+          },
+          "above_z_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Above Z Mm"
+          },
+          "apartment_zones_count": {
+            "default": 0,
+            "title": "Apartment Zones Count",
+            "type": "integer"
+          },
+          "balcony_terrace_zones_count": {
+            "default": 0,
+            "title": "Balcony Terrace Zones Count",
+            "type": "integer"
+          },
+          "below_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Below Label"
+          },
+          "below_z_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Below Z Mm"
+          },
+          "coordinate_bridge": {
+            "title": "Coordinate Bridge",
+            "type": "string"
+          },
+          "mop_zones_count": {
+            "default": 0,
+            "title": "Mop Zones Count",
+            "type": "integer"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "placement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CadProjectViewPlacement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/CadProjectZoneSummary"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "view_key",
+          "revision_id",
+          "page_index",
+          "view",
+          "coordinate_bridge"
+        ],
+        "title": "CadProjectFocusView",
+        "type": "object"
+      },
+      "CadProjectKrLevel": {
+        "description": "Отметка верха плиты этажа по заголовку схемы КР (`cad_project_levels`).",
+        "properties": {
+          "corps": {
+            "title": "Corps",
+            "type": "string"
+          },
+          "floor": {
+            "title": "Floor",
+            "type": "integer"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "source": {
+            "default": "схеме КР",
+            "title": "Source",
+            "type": "string"
+          },
+          "z_mm": {
+            "title": "Z Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "corps",
+          "floor",
+          "z_mm",
+          "ref"
+        ],
+        "title": "CadProjectKrLevel",
+        "type": "object"
+      },
       "CadProjectLevelsRead": {
         "description": "Уровни проекта; записи нет — все поля `null`.",
         "properties": {
@@ -10373,6 +11150,123 @@
         "title": "CadProjectLevelsWrite",
         "type": "object"
       },
+      "CadProjectSectionLevel": {
+        "description": "Уровень этажа из распознанного разреза АР (`cad_sections`).",
+        "properties": {
+          "auto_accepted": {
+            "default": false,
+            "title": "Auto Accepted",
+            "type": "boolean"
+          },
+          "clear_height_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Height Mm"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "cut": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut"
+          },
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "integer"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "floor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "structure_mm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structure Mm"
+          },
+          "upper_elevation_mm": {
+            "title": "Upper Elevation Mm",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "page_index",
+          "elevation_mm",
+          "upper_elevation_mm",
+          "status",
+          "evidence"
+        ],
+        "title": "CadProjectSectionLevel",
+        "type": "object"
+      },
       "CadProjectSummaryRead": {
         "description": "Листы последних открываемых ревизий проекта по состоянию конвейера CAD.\n\nИнвариант: `sheets_total` = `sheets_done` + `sheets_review` + `sheets_running` +\n`sheets_failed` + `sheets_idle`.",
         "properties": {
@@ -10415,6 +11309,316 @@
           "documents_total"
         ],
         "title": "CadProjectSummaryRead",
+        "type": "object"
+      },
+      "CadProjectViewPlacement": {
+        "description": "Положение одного вида (этажа) в общей системе здания и его высоты.",
+        "properties": {
+          "alignment": {
+            "enum": [
+              "reference",
+              "axes",
+              "none"
+            ],
+            "title": "Alignment",
+            "type": "string"
+          },
+          "alignment_axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alignment Axes",
+            "type": "array"
+          },
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "corps": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corps"
+          },
+          "elevation_known": {
+            "title": "Elevation Known",
+            "type": "boolean"
+          },
+          "floor_height_known": {
+            "title": "Floor Height Known",
+            "type": "boolean"
+          },
+          "floor_height_mm": {
+            "title": "Floor Height Mm",
+            "type": "integer"
+          },
+          "floor_height_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "derived_stack",
+                  "default"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor Height Source"
+          },
+          "frame": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame"
+          },
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level_zones_count": {
+            "default": 0,
+            "title": "Level Zones Count",
+            "type": "integer"
+          },
+          "offset_mm": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Offset Mm",
+            "type": "array"
+          },
+          "outline_source": {
+            "enum": [
+              "slab",
+              "bbox"
+            ],
+            "title": "Outline Source",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "rotation_deg": {
+            "default": 0.0,
+            "title": "Rotation Deg",
+            "type": "number"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "slab_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slab Area M2"
+          },
+          "slab_thickness_known": {
+            "title": "Slab Thickness Known",
+            "type": "boolean"
+          },
+          "slab_thickness_mm": {
+            "title": "Slab Thickness Mm",
+            "type": "integer"
+          },
+          "typical_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typical Of"
+          },
+          "view": {
+            "title": "View",
+            "type": "integer"
+          },
+          "view_key": {
+            "title": "View Key",
+            "type": "string"
+          },
+          "windows_count": {
+            "default": 0,
+            "title": "Windows Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "view_key",
+          "job_id",
+          "revision_id",
+          "page_index",
+          "view",
+          "label",
+          "group_key",
+          "group_label",
+          "base_z_mm",
+          "elevation_known",
+          "floor_height_mm",
+          "floor_height_known",
+          "slab_thickness_mm",
+          "slab_thickness_known",
+          "offset_mm",
+          "alignment",
+          "outline_source"
+        ],
+        "title": "CadProjectViewPlacement",
+        "type": "object"
+      },
+      "CadProjectZoneSummary": {
+        "description": "Зона помещения на листе (`cad_zones`), включая балконы/террасы и МОП.",
+        "properties": {
+          "apartment_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment No"
+          },
+          "expl_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expl Area M2"
+          },
+          "generator_area_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generator Area M2"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "room_mark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Mark"
+          },
+          "room_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Type"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "source",
+          "quality_status"
+        ],
+        "title": "CadProjectZoneSummary",
         "type": "object"
       },
       "CadQueueItemRead": {
@@ -32925,6 +34129,177 @@
         "title": "OAuthAuthorizeRedirect",
         "type": "object"
       },
+      "ObjectBaseCoordination": {
+        "additionalProperties": false,
+        "description": "`coordination.json`: сетка осей и этажи по группам здания (корпус/секция), мм здания.",
+        "properties": {
+          "doubts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Doubts",
+            "type": "array"
+          },
+          "frame": {
+            "const": "building_mm",
+            "title": "Frame",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectBaseCoordinationGroup"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "schema": {
+            "const": "quantor.object_base.coordination.v1",
+            "title": "Schema",
+            "type": "string"
+          },
+          "units": {
+            "const": "mm",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "units",
+          "frame",
+          "groups",
+          "doubts"
+        ],
+        "title": "ObjectBaseCoordination",
+        "type": "object"
+      },
+      "ObjectBaseCoordinationAxis": {
+        "additionalProperties": false,
+        "description": "Ось группы линией в мм системы здания: точка на оси и единичное направление.",
+        "properties": {
+          "direction": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Direction",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "orient": {
+            "enum": [
+              "vertical",
+              "horizontal"
+            ],
+            "title": "Orient",
+            "type": "string"
+          },
+          "point_mm": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Point Mm",
+            "type": "array"
+          },
+          "spread_mm": {
+            "title": "Spread Mm",
+            "type": "integer"
+          },
+          "views": {
+            "title": "Views",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "orient",
+          "point_mm",
+          "direction",
+          "views",
+          "spread_mm"
+        ],
+        "title": "ObjectBaseCoordinationAxis",
+        "type": "object"
+      },
+      "ObjectBaseCoordinationGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "axes": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectBaseCoordinationAxis"
+            },
+            "title": "Axes",
+            "type": "array"
+          },
+          "group_key": {
+            "title": "Group Key",
+            "type": "string"
+          },
+          "group_label": {
+            "title": "Group Label",
+            "type": "string"
+          },
+          "storeys": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectBaseCoordinationStorey"
+            },
+            "title": "Storeys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_key",
+          "group_label",
+          "axes",
+          "storeys"
+        ],
+        "title": "ObjectBaseCoordinationGroup",
+        "type": "object"
+      },
+      "ObjectBaseCoordinationStorey": {
+        "additionalProperties": false,
+        "properties": {
+          "base_z_mm": {
+            "title": "Base Z Mm",
+            "type": "integer"
+          },
+          "elevation_known": {
+            "default": true,
+            "title": "Elevation Known",
+            "type": "boolean"
+          },
+          "floor_height_mm": {
+            "title": "Floor Height Mm",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "view_keys": {
+            "items": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}:\\d{1,4}:\\d{1,3}$",
+              "type": "string"
+            },
+            "title": "View Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "label",
+          "base_z_mm",
+          "floor_height_mm",
+          "view_keys"
+        ],
+        "title": "ObjectBaseCoordinationStorey",
+        "type": "object"
+      },
       "OriginalPrediction": {
         "additionalProperties": false,
         "description": "Исходный выход модели или детерминированного экстрактора до исправлений человека.",
@@ -50056,6 +51431,106 @@
         "summary": "Трассы механики листа в 3D: вершины в мм DXF вида, Z от отметки этажа",
         "tags": [
           "cad-mep"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/project-context": {
+      "get": {
+        "operationId": "read_cad_project_context",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ревизия фокусного вида (вместе с page_index и view)",
+            "in": "query",
+            "name": "revision_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ревизия фокусного вида (вместе с page_index и view)",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "description": "Индекс страницы фокусного вида с 0",
+            "in": "query",
+            "name": "page_index",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Индекс страницы фокусного вида с 0",
+              "title": "Page Index"
+            }
+          },
+          {
+            "description": "Номер фокусного вида на странице",
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Номер фокусного вида на странице",
+              "title": "View"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadProjectContextRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Проектный контекст CAD: координатная сетка, высоты (разрезы/КР), фасады и зоны",
+        "tags": [
+          "cad-building3d"
         ]
       }
     },

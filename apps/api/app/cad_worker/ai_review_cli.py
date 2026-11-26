@@ -2,11 +2,13 @@
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import shlex
 import subprocess
 import tarfile
 from pathlib import Path
+from typing import Any
 
 # Получатель читает только фиксированный набор имён из архива, который подготовил исполнитель.
 # Временная папка и независимый таймаут на сервере ограничивают время хранения пакета.
@@ -17,8 +19,8 @@ from pathlib import Path
 timeout = int(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="quantor-ai-") as directory:
     root = Path(directory)
-    names = {"manifest.json", "walls.json", "source.pdf", "plan.png", "overlay.png",
-             "prompt.txt", "schema.json", "render.json"}
+    names = {"manifest.json", "walls.json", "project_context.json", "source.pdf", "plan.png",
+             "overlay.png", "slab_overlay.png", "prompt.txt", "schema.json", "render.json"}
     with tarfile.open(fileobj=sys.stdin.buffer, mode="r|") as archive:
         for member in archive:
             if member.name not in names or not member.isfile() or member.size > 32 * 1024 * 1024:
@@ -116,7 +118,8 @@ def render(root: Path) -> None:
     ]
     (root / "render.json").write_text(json.dumps({"clip": extent, "zoom": zoom}), encoding="utf-8")
 
-    image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    base_rgb = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    image = base_rgb.copy()
     draw = ImageDraw.Draw(image)
     ox, oy, mm_per_pt = manifest["frame"]
 
@@ -138,9 +141,28 @@ def render(root: Path) -> None:
             draw_ring(opening["lintel"], "#15803d")
     image.save(root / "overlay.png")
 
+    spec = importlib.util.spec_from_file_location(
+        "view_render_cli", Path(__file__).with_name("view_render_cli.py")
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("view_render_cli.py не найден рядом с ai_review_cli.py")
+    render_mod: Any = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(render_mod)
+    render_mod.render_slab_overlay(
+        base_rgb=base_rgb,
+        walls=walls,
+        frame=(ox, oy, mm_per_pt),
+        zoom=zoom,
+        pix_x=pix.x,
+        pix_y=pix.y,
+        out_path=root / "slab_overlay.png",
+    )
+
 
 def review(root: Path, ssh_config: str, timeout: int) -> None:
     render(root)
+    if not (root / "project_context.json").is_file():
+        (root / "project_context.json").write_text("{}", encoding="utf-8")
     # Промт положил исполнитель из активной версии (ai_prompt_versions); здесь он только читается.
     prompt = (root / "prompt.txt").read_bytes().decode("utf-8")
     package = root / "bundle.tar"
@@ -148,9 +170,11 @@ def review(root: Path, ssh_config: str, timeout: int) -> None:
         for name in (
             "manifest.json",
             "walls.json",
+            "project_context.json",
             "source.pdf",
             "plan.png",
             "overlay.png",
+            "slab_overlay.png",
             "prompt.txt",
             "schema.json",
             "render.json",
