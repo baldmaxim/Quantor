@@ -23,6 +23,13 @@ export const CadMepDecision: FC<ICadMepDecisionProps> = ({ title, decision, chil
     <p className="text-xs text-muted [overflow-wrap:anywhere]">
       {decision.decided_by_name ?? 'Пользователь без имени'} · {formatTime(decision.decided_at)}
     </p>
+    {decision.carried_from_id && (
+      <p className="text-xs text-muted" data-testid="mep-decision-carried">
+        {decision.carried_from_decided_at
+          ? `Перенесено с прогона от ${formatTime(decision.carried_from_decided_at)} (геометрия не изменилась)`
+          : 'Перенесено с прошлого прогона (геометрия не изменилась)'}
+      </p>
+    )}
     {decision.comment && (
       <p className="text-xs [overflow-wrap:anywhere]">{decision.comment}</p>
     )}

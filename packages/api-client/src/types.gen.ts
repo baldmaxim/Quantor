@@ -2706,6 +2706,14 @@ export type CadDecisionRead = {
      */
     attempt: number;
     /**
+     * Carried From Decided At
+     */
+    carried_from_decided_at?: string | null;
+    /**
+     * Carried From Id
+     */
+    carried_from_id?: string | null;
+    /**
      * Comment
      */
     comment: string | null;

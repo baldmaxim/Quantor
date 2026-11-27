@@ -168,6 +168,27 @@ describe('вкладка «Трассы»: одобрение вида', () => {
     expect(screen.queryByRole('button', { name: 'Одобрить вид' })).toBeNull();
     expect(screen.getByTestId('mep-decision')).toHaveTextContent('Вид одобрен');
     expect(screen.getByTestId('mep-decision')).toHaveTextContent('Инженер Иванов');
+    expect(screen.queryByTestId('mep-decision-carried')).toBeNull();
+  });
+
+  it('перенесённое решение помечено', () => {
+    mount(mep({ approval: { ...decision('view_approval'), carried_from_id: 'd0' } }));
+    expect(screen.getByTestId('mep-decision-carried')).toHaveTextContent('геометрия не изменилась');
+  });
+
+  it('у перенесённого решения показана дата исходного', () => {
+    mount(
+      mep({
+        approval: {
+          ...decision('view_approval'),
+          carried_from_id: 'd0',
+          carried_from_decided_at: '2026-11-20T09:30:00Z',
+        },
+      }),
+    );
+    const text = screen.getByTestId('mep-decision-carried').textContent ?? '';
+    expect(text).toContain('Перенесено с прогона от ');
+    expect(text).toContain('(геометрия не изменилась)');
   });
 });
 

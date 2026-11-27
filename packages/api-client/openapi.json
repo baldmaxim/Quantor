@@ -5311,6 +5311,30 @@
             "title": "Attempt",
             "type": "integer"
           },
+          "carried_from_decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carried From Decided At"
+          },
+          "carried_from_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carried From Id"
+          },
           "comment": {
             "anyOf": [
               {

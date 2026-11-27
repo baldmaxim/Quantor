@@ -55,9 +55,10 @@ from app.errors import ErrorCode
 from app.models import CadDecision, CadRemark, DocumentRevision, Job
 from app.models.cad_decision import DECISION_VIEW_APPROVAL
 from app.services import cad as cad_service
+from app.services import cad_decisions_carry, cad_progress, cad_risers
 from app.services import cad_mep as cad_mep_service
-from app.services import cad_progress, cad_risers
 from app.services import jobs as jobs_service
+from app.services.cad_geometry_fingerprint import dxf_geometry_sha256
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
@@ -179,6 +180,14 @@ def _check_levels(payload: dict[str, Any]) -> None:
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "высота потолка коридора задана неверно")
     if payload.get("clear_height_mm") is not None and payload.get("slab_thickness_mm") is not None:
         raise CadError(ErrorCode.CAD_PARAMS_INVALID, "высота в свету и толщина плиты заданы вместе")
+
+
+def _routes_fingerprint(path: Path) -> str | None:
+    """Отпечаток DXF трасс; ошибка чтения - нет отпечатка (перенос принятия не делается)."""
+    try:
+        return dxf_geometry_sha256(path.read_bytes())
+    except OSError:
+        return None
 
 
 async def _checked_input(session: AsyncSession, job: Job) -> _Input:
@@ -515,6 +524,9 @@ async def execute_cad_mep_route(
         if code != 0:
             raise _generator_failure(code, output)
         files, candidate = _verified_route_outputs(out, source, revision, params.sha256)
+        routes_fingerprint = await asyncio.to_thread(
+            _routes_fingerprint, out / source.folder / cad_mep_service.ROUTES_DXF
+        )
         if not await _still_owned(session, job, owner, attempt):
             log.warning("cad_lease_lost", job_id=str(job.id))
             return job
@@ -570,6 +582,12 @@ async def execute_cad_mep_route(
                         "failure_reason": None,
                         "dxf": f"{source.folder}/{cad_mep_service.ROUTES_DXF}",
                         "dxf_entities": None,
+                        # Для переноса принятия трасс на прогон с той же геометрией.
+                        **(
+                            {"dxf_geometry_sha256": routes_fingerprint}
+                            if routes_fingerprint
+                            else {}
+                        ),
                     }
                 ],
             }
@@ -585,4 +603,7 @@ async def execute_cad_mep_route(
         result_status=cad_service.RESULT_WITH_CAD,
     )
     await _bind_remarks_to_result(session, job, source, attempt, result)
-    return await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
+    # Одобрение перенесено с прошлого прогона и трассы совпали с принятыми: принятие переносится.
+    await cad_decisions_carry.carry_routes_acceptance(session, done)
+    return done

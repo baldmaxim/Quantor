@@ -270,6 +270,7 @@ async def revoke_cad_decision(
         decision,
         await cad_mep_service.decision_author(session, decision),
         await cad_mep_service.revoker_name(session, decision),
+        await cad_mep_service.carried_decided_at(session, decision),
     )
     await session.commit()
     return result

@@ -32,9 +32,10 @@ from app.core.logging import get_logger
 from app.domain import JobStatus
 from app.errors import MESSAGES, ErrorCode
 from app.models import DocumentRevision, Job
-from app.services import ai_loop, cad_progress, cad_walls, cad_zones_auto
+from app.services import ai_loop, cad_decisions_carry, cad_progress, cad_walls, cad_zones_auto
 from app.services import cad as cad_service
 from app.services import jobs as jobs_service
+from app.services.cad_geometry_fingerprint import dxf_geometry_sha256
 from app.storage.base import ObjectNotFoundError, ObjectStorage, StorageUnavailableError
 
 log = get_logger(__name__)
@@ -212,7 +213,43 @@ def _verified_outputs(
     return report, files
 
 
-def _page_summary(report: dict[str, Any]) -> list[dict[str, Any]]:
+def _view_file_hashes(
+    out: Path, report: dict[str, Any], name: str, digest: Callable[[bytes], str | None]
+) -> dict[tuple[int, int], str]:
+    """Хеш файла `name` каждого вида (страница с 0, вид); без файла или при ошибке - нет записи."""
+    found: dict[tuple[int, int], str] = {}
+    for page in report.get("pages", []):
+        for view in page.get("views", []):
+            try:
+                key = (int(page["index"]), int(view["view"]))
+                path = out / cad_service.view_folder(*key) / name
+                if not path.is_file() or path.is_symlink():
+                    continue
+                value = digest(path.read_bytes())
+            except (KeyError, TypeError, ValueError, OSError):
+                continue
+            if value is not None:
+                found[key] = value
+    return found
+
+
+def _geometry_fingerprints(out: Path, report: dict[str, Any]) -> dict[tuple[int, int], str]:
+    """Отпечаток геометрии DXF каждого вида (страница с 0, вид) - для переноса решений человека."""
+    return _view_file_hashes(out, report, "plan_candidates.dxf", dxf_geometry_sha256)
+
+
+def _scale_hashes(out: Path, report: dict[str, Any]) -> dict[tuple[int, int], str]:
+    """sha256 `scale.json` каждого вида: масштаб и привязка входят в условие переноса одобрения."""
+    return _view_file_hashes(
+        out, report, "scale.json", lambda data: hashlib.sha256(data).hexdigest()
+    )
+
+
+def _page_summary(
+    report: dict[str, Any],
+    fingerprints: dict[tuple[int, int], str] | None = None,
+    scale_hashes: dict[tuple[int, int], str] | None = None,
+) -> list[dict[str, Any]]:
     pages: list[dict[str, Any]] = []
     for page in report.get("pages", []):
         views = [
@@ -226,6 +263,17 @@ def _page_summary(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "failure_reason": view.get("failure_reason"),
                 "dxf": (view.get("dxf") or {}).get("file"),
                 "dxf_entities": (view.get("dxf") or {}).get("entities"),
+                # Старые итоги поля не имеют: перенос решений для них не делается.
+                **(
+                    {"dxf_geometry_sha256": fingerprints[(page["index"], view["view"])]}
+                    if fingerprints and (page["index"], view["view"]) in fingerprints
+                    else {}
+                ),
+                **(
+                    {"scale_sha256": scale_hashes[(page["index"], view["view"])]}
+                    if scale_hashes and (page["index"], view["view"]) in scale_hashes
+                    else {}
+                ),
             }
             for view in page.get("views", [])
         ]
@@ -511,6 +559,8 @@ async def execute_cad_pdf_convert(
             raise _failure_from_report(out, code)
         report, files = _verified_outputs(out, revision, str(job.payload["params_sha256"]))
         hatch_applied = _hatch_applied(out)
+        fingerprints = await asyncio.to_thread(_geometry_fingerprints, out, report)
+        scale_hashes = await asyncio.to_thread(_scale_hashes, out, report)
         unconfirmed = _unconfirmed_auto_pages(params, report)
         if unconfirmed:
             raise CadError(
@@ -553,7 +603,7 @@ async def execute_cad_pdf_convert(
         "params_sha256": job.payload["params_sha256"],
         "attempt": attempt,
         "dxf_count": sum(1 for row in artifacts if row["name"].endswith(".dxf")),
-        "pages": _page_summary(report),
+        "pages": _page_summary(report, fingerprints, scale_hashes),
         "artifacts": artifacts,
         "hatch_applied": hatch_applied,
     }
@@ -572,6 +622,9 @@ async def execute_cad_pdf_convert(
     await cad_zones_auto.enqueue_after_convert(session, done, settings)
     # Петля ИИ пилота: оформление первого прогона плана и перенос замечаний перестроения.
     await ai_loop.after_convert(session, done, settings)
+    # Решения человека по видам, геометрия которых не изменилась, переносятся на этот прогон;
+    # после петли ИИ: перенесённые ею замечания перестроения не дают перенести одобрение.
+    await cad_decisions_carry.carry_after_convert(session, done, settings)
     return done
 
 

@@ -101,10 +101,17 @@ class CadDecisionRead(BaseModel):
     revoked_by: UUID | None = None
     revoked_by_name: str | None = None
     revoke_reason: str | None = None
+    # Решение перенесено с прошлого прогона (геометрия вида не изменилась): исходное решение.
+    carried_from_id: UUID | None = None
+    # Время исходного решения у перенесённого; пусто у обычного решения.
+    carried_from_decided_at: datetime | None = None
 
 
 def decision_read(
-    decision: CadDecision, author: str | None, revoker: str | None = None
+    decision: CadDecision,
+    author: str | None,
+    revoker: str | None = None,
+    carried_from_decided_at: datetime | None = None,
 ) -> CadDecisionRead:
     return CadDecisionRead.model_validate(
         {
@@ -123,6 +130,8 @@ def decision_read(
             "revoked_by": decision.revoked_by,
             "revoked_by_name": revoker,
             "revoke_reason": decision.revoke_reason,
+            "carried_from_id": decision.carried_from_id,
+            "carried_from_decided_at": carried_from_decided_at,
         }
     )
 
@@ -254,6 +263,12 @@ def _route_ref(job: Job, state: cad_mep_service.MepState) -> CadRouteJobRead:
     )
 
 
+def _state_decision(
+    row: cad_mep_service.DecisionRow, state: cad_mep_service.MepState
+) -> CadDecisionRead:
+    return decision_read(*row, carried_from_decided_at=state.carried_at.get(row[0].id))
+
+
 def view_mep_read(
     job: Job,
     result_attempt: int | None,
@@ -276,10 +291,10 @@ def view_mep_read(
         for ref in (_route_ref(route, state),)
     ]
     return CadViewMepRead(
-        approval=decision_read(*approval) if approval else None,
-        acceptance=decision_read(*acceptance) if acceptance else None,
+        approval=_state_decision(approval, state) if approval else None,
+        acceptance=_state_decision(acceptance, state) if acceptance else None,
         route_jobs=routes,
-        revoked_decisions=[decision_read(*row) for row in state.revoked.get(key, [])],
+        revoked_decisions=[_state_decision(row, state) for row in state.revoked.get(key, [])],
     )
 
 

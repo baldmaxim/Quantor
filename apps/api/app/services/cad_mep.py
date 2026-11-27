@@ -163,6 +163,8 @@ class MepState:
     revoked: dict[ViewKey, list[DecisionRow]] = field(default_factory=dict)
     # одобрения, на которые ссылаются route-задания (в том числе отозванные)
     approval_by_id: dict[uuid.UUID, CadDecision] = field(default_factory=dict)
+    # id перенесённого решения -> время исходного решения (один запрос вместе с решениями)
+    carried_at: dict[uuid.UUID, datetime] = field(default_factory=dict)
     # parent_job_id -> route-задания, новые сверху
     routes: dict[uuid.UUID, list[Job]] = field(default_factory=dict)
 
@@ -221,6 +223,7 @@ async def load_state(session: AsyncSession, jobs: list[Job]) -> MepState:
         return state
     approval_ids = {a for a in (approval_id_of(job) for job in route_jobs) if a is not None}
     revoker = aliased(UserIdentity)
+    source = aliased(CadDecision)
     rows = await session.execute(
         select(
             CadDecision,
@@ -228,13 +231,17 @@ async def load_state(session: AsyncSession, jobs: list[Job]) -> MepState:
             UserIdentity.email,
             revoker.display_name,
             revoker.email,
+            source.decided_at,
         )
         .join(UserIdentity, UserIdentity.id == CadDecision.decided_by)
         .outerjoin(revoker, revoker.id == CadDecision.revoked_by)
+        .outerjoin(source, source.id == CadDecision.carried_from_id)
         .where(or_(CadDecision.job_id.in_(ids), CadDecision.id.in_(approval_ids)))
         .order_by(CadDecision.decided_at)
     )
-    for decision, name, email, revoker_name, revoker_email in rows.all():
+    for decision, name, email, revoker_name, revoker_email, source_at in rows.all():
+        if source_at is not None:
+            state.carried_at[decision.id] = source_at
         key = (decision.job_id, decision.attempt, decision.page_index, decision.view)
         row: DecisionRow = (decision, name or email, revoker_name or revoker_email)
         if decision.kind == DECISION_VIEW_APPROVAL:
@@ -281,6 +288,16 @@ async def decision_author(session: AsyncSession, decision: CadDecision) -> str |
         )
     ).first()
     return None if row is None else (row[0] or row[1])
+
+
+async def carried_decided_at(session: AsyncSession, decision: CadDecision) -> datetime | None:
+    """Время исходного решения у перенесённого (одним запросом); у обычного решения - `None`."""
+    if decision.carried_from_id is None:
+        return None
+    found: datetime | None = await session.scalar(
+        select(CadDecision.decided_at).where(CadDecision.id == decision.carried_from_id)
+    )
+    return found
 
 
 async def revoker_name(session: AsyncSession, decision: CadDecision) -> str | None:
@@ -373,6 +390,7 @@ async def _insert_decision(
     artifact_sha256: str,
     comment: str | None,
     user_id: uuid.UUID,
+    carried_from_id: uuid.UUID | None = None,
 ) -> CadDecision:
     statement = (
         insert(CadDecision)
@@ -388,6 +406,7 @@ async def _insert_decision(
             artifact_sha256=artifact_sha256,
             decided_by=user_id,
             comment=comment,
+            carried_from_id=carried_from_id,
         )
         .on_conflict_do_nothing(
             index_elements=[getattr(CadDecision, name) for name in DECISION_KEY],
