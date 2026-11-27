@@ -21,11 +21,14 @@ with tempfile.TemporaryDirectory(prefix="quantor-ai-") as directory:
     root = Path(directory)
     names = {"manifest.json", "walls.json", "project_context.json", "source.pdf", "plan.png",
              "overlay.png", "slab_overlay.png", "prompt.txt", "schema.json", "render.json"}
+    optional = {"prev_round_diff.json"}
     with tarfile.open(fileobj=sys.stdin.buffer, mode="r|") as archive:
         for member in archive:
-            if member.name not in names or not member.isfile() or member.size > 32 * 1024 * 1024:
+            allowed = member.name in names or member.name in optional
+            if not allowed or not member.isfile() or member.size > 32 * 1024 * 1024:
                 sys.exit("Invalid review package")
-            names.remove(member.name)
+            names.discard(member.name)
+            optional.discard(member.name)
             with (root / member.name).open("xb") as target:
                 shutil.copyfileobj(archive.extractfile(member), target)
     if names:
@@ -183,6 +186,11 @@ def review(root: Path, ssh_config: str, timeout: int) -> None:
             if path.stat().st_size > 32 * 1024 * 1024:
                 raise ValueError(f"Файл пакета превышает 32 МиБ: {name}")
             archive.add(path, arcname=name)
+        prev_diff = root / "prev_round_diff.json"
+        if prev_diff.is_file() and prev_diff.stat().st_size > 2:
+            if prev_diff.stat().st_size > 32 * 1024 * 1024:
+                raise ValueError("Файл пакета превышает 32 МиБ: prev_round_diff.json")
+            archive.add(prev_diff, arcname="prev_round_diff.json")
     command = [
         "ssh",
         "-F",

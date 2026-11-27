@@ -22,6 +22,7 @@ corrector ready_for_human_review или круги исчерпаны -> verifie
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from collections.abc import Iterable, Sequence
 from typing import Any, Final
@@ -40,9 +41,14 @@ from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.errors import DomainError
-from app.models import CadRemark, Job
+from app.models import CadRemark, Job, PageGeometry, Sheet
 from app.services import cad as cad_service
-from app.services import cad_convert_hints, cad_remarks, cad_walls
+from app.services import (
+    cad_ai_feedback,
+    cad_convert_hints,
+    cad_remarks,
+    cad_walls,
+)
 from app.services import jobs as jobs_service
 from app.storage.base import ObjectStorage, StorageUnavailableError
 
@@ -151,6 +157,39 @@ async def _chain_reviews(
 
 def _of_role(jobs: Iterable[Job], role: str) -> list[Job]:
     return [job for job in jobs if job.payload.get("role") == role]
+
+
+async def _read_json_artifact(storage: ObjectStorage, job: Job, name: str) -> dict[str, Any] | None:
+    """Читает JSON-артефакт задания из хранилища с ограничением памяти."""
+    artifact = cad_service.find_artifact(job, name)
+    key = artifact.get("key") if isinstance(artifact, dict) else None
+    if not isinstance(key, str) or not key:
+        return None
+    buf = bytearray()
+    async for chunk in storage.iter_stream(key):
+        buf.extend(chunk)
+        if len(buf) > cad_service.MAX_JSON_ARTIFACT_BYTES:
+            return None
+    data = json.loads(bytes(buf))
+    return data if isinstance(data, dict) else None
+
+
+async def _read_walls_json(
+    storage: ObjectStorage, walls: Job, page_index: int, view: int
+) -> dict[str, Any] | None:
+    """Читает `walls.json` задания конструкций из хранилища с ограничением памяти."""
+    return await _read_json_artifact(
+        storage, walls, f"{cad_service.view_folder(page_index, view)}/{cad_walls.WALLS_JSON}"
+    )
+
+
+async def _read_convert_checks(
+    storage: ObjectStorage, convert: Job, page_index: int, view: int
+) -> dict[str, Any] | None:
+    """Читает `checks.json` задания преобразования (подсказки `missing_wall`/`missing_door`)."""
+    return await _read_json_artifact(
+        storage, convert, f"{cad_service.view_folder(page_index, view)}/checks.json"
+    )
 
 
 def _style_result(job: Job) -> AiStyleResult | None:
@@ -563,6 +602,26 @@ async def _after_review_impl(
         await _after_corrector(session, storage, review, pilot, settings)
 
 
+async def _resolve_best_for_verifier(
+    session: AsyncSession,
+    current_walls: Job,
+    current_convert: Job,
+    best_walls_id: uuid.UUID | None,
+) -> tuple[Job, Job]:
+    """Возвращает `(walls, convert)` лучшего успешного снимка цепочки (или текущего)."""
+    if best_walls_id is not None and best_walls_id != current_walls.id:
+        candidate = await session.get(Job, best_walls_id)
+        if (
+            candidate is not None
+            and candidate.job_type is JobType.CAD_WALLS
+            and candidate.status is JobStatus.SUCCEEDED
+        ):
+            ctx = await _walls_context(session, candidate)
+            if ctx is not None:
+                return candidate, ctx[0]
+    return current_walls, current_convert
+
+
 async def _after_corrector(
     session: AsyncSession,
     storage: ObjectStorage,
@@ -573,7 +632,9 @@ async def _after_corrector(
     raw = review.payload.get("ai_review")
     if review.status is not JobStatus.SUCCEEDED or not isinstance(raw, dict):
         return
-    verdict = AiReviewResult.model_validate(raw).report.verdict
+    ai_result = AiReviewResult.model_validate(raw)
+    report = ai_result.report
+    verdict = report.verdict
     walls = await session.get(Job, uuid.UUID(str(review.payload.get("walls_job_id"))))
     convert = await session.get(Job, uuid.UUID(str(review.payload.get("cad_job_id"))))
     page_index, view = review.payload.get("page_index"), review.payload.get("view")
@@ -587,38 +648,160 @@ async def _after_corrector(
         or review.project_id is None
     ):
         return
-    if verdict == "ready_for_human_review":
-        await _start_verifier(session, walls, convert, pilot, settings)
-        return
-    if verdict != "needs_correction":
-        return  # insufficient_evidence: решает человек
+    revision_id_str = str(convert.payload.get("revision_id"))
     reviews = await _chain_reviews(
         session,
         project_id=review.project_id,
-        revision_id=str(convert.payload.get("revision_id")),
+        revision_id=revision_id_str,
         page_index=page_index,
         view=view,
     )
+    progress: cad_ai_feedback.RoundProgress | None = None
+    best_walls_id: uuid.UUID | None = walls.id
+    try:
+        curr_walls_data = await _read_walls_json(storage, walls, page_index, view)
+        curr_checks = await _read_convert_checks(storage, convert, page_index, view)
+        if curr_walls_data is not None:
+            prev_walls_data: dict[str, Any] | None = None
+            prev_checks: dict[str, Any] | None = None
+            prev_walls_id: uuid.UUID | None = None
+            prev_marker: dict[str, Any] = {}
+            for prev_row in _of_role(reviews, "corrector"):
+                if prev_row.id == review.id or prev_row.status is not JobStatus.SUCCEEDED:
+                    continue
+                prev_raw = prev_row.payload.get("ai_review")
+                if isinstance(prev_raw, dict):
+                    prev_res = AiReviewResult.model_validate(prev_raw)
+                    prev_walls_id = prev_res.walls_job_id
+                    prev_marker = _loop_marker(prev_row)
+                    prev_walls_job = await session.get(Job, prev_walls_id)
+                    if prev_walls_job is not None:
+                        prev_walls_data = await _read_walls_json(
+                            storage, prev_walls_job, prev_res.page_index, prev_res.view
+                        )
+                    prev_convert_job = await session.get(Job, prev_res.cad_job_id)
+                    if prev_convert_job is not None:
+                        prev_checks = await _read_convert_checks(
+                            storage, prev_convert_job, prev_res.page_index, prev_res.view
+                        )
+                    break
+            progress = cad_ai_feedback.check_round_progress(
+                prev_walls_data,
+                curr_walls_data,
+                convert_checks=curr_checks,
+                prev_convert_checks=prev_checks,
+            )
+            prev_best_id = prev_walls_id
+            raw_best_id = prev_marker.get("best_walls_job_id")
+            if isinstance(raw_best_id, str):
+                try:
+                    prev_best_id = uuid.UUID(raw_best_id)
+                except ValueError:
+                    prev_best_id = prev_walls_id
+            raw_best_score = prev_marker.get("best_quality_score")
+            prev_best_score: float | None = (
+                float(raw_best_score)
+                if isinstance(raw_best_score, int | float)
+                else progress.prev_score
+            )
+            if (
+                prev_best_score is not None
+                and prev_best_id is not None
+                and progress.curr_score < prev_best_score
+            ):
+                best_walls_id = prev_best_id
+                best_score = prev_best_score
+            else:
+                best_walls_id = walls.id
+                best_score = progress.curr_score
+            _with_marker(
+                review,
+                quality_score=progress.curr_score,
+                progress_status=progress.status,
+                best_walls_job_id=str(best_walls_id),
+                best_quality_score=best_score,
+            )
+    except Exception:
+        log.warning("ai_loop_progress_check_failed", job_id=str(review.id), exc_info=True)
+
+    # Кандидаты зон плиты сохраняются только в маркере задания для подтверждения человеком в UI/API
+    # и никогда не пишутся автоматически в `cad_zones` (иначе попали бы в отделку МОП / ВОР).
+    if any(f.kind == "slab_missing_area" for f in report.slab_findings):
+        try:
+            rev_uuid = uuid.UUID(revision_id_str)
+            geometry = await session.scalar(
+                select(PageGeometry)
+                .join(Sheet, PageGeometry.sheet_id == Sheet.id)
+                .where(Sheet.revision_id == rev_uuid, Sheet.page_index == page_index)
+            )
+            if geometry is not None:
+                zone_creates = cad_ai_feedback.slab_findings_to_zone_creates(
+                    report,
+                    ai_result.render,
+                    page_width_pt=float(geometry.display_width_pt),
+                    page_height_pt=float(geometry.display_height_pt),
+                    revision_id=rev_uuid,
+                    page_index=page_index,
+                )
+                if zone_creates:
+                    _with_marker(
+                        review,
+                        pending_slab_zones=[z.model_dump(mode="json") for z in zone_creates],
+                    )
+        except Exception:
+            log.warning("ai_loop_pending_slab_zones_failed", job_id=str(review.id), exc_info=True)
+
+    if verdict == "ready_for_human_review":
+        v_walls, v_convert = (
+            await _resolve_best_for_verifier(session, walls, convert, best_walls_id)
+            if progress is not None and progress.status == "regressed"
+            else (walls, convert)
+        )
+        await _start_verifier(session, v_walls, v_convert, pilot, settings)
+        return
+    if verdict != "needs_correction":
+        return  # insufficient_evidence: решает человек
     if len(_of_role(reviews, "corrector")) >= pilot.max_iterations:
-        await _start_verifier(session, walls, convert, pilot, settings)
+        v_walls, v_convert = await _resolve_best_for_verifier(
+            session, walls, convert, best_walls_id
+        )
+        await _start_verifier(session, v_walls, v_convert, pilot, settings)
         return
     remarks = await cad_remarks.list_remarks(
         session, job=convert, attempt=attempt, page_index=page_index, view=view
     )
+    has_open_false_wall = any(row.status == _OPEN and row.type == "false_wall" for row in remarks)
     hints = cad_convert_hints.hints_from_remarks(remarks, page_index + 1)
+    reconvert_params: dict[str, Any] | None = None
+    has_new_reconvert = False
     if hints is not None:
         merged_hints = cad_convert_hints.merge_hints(
             cad_convert_hints.previous_hints_of(convert), hints.hints
         )
-        params = cad_convert_hints.reconvert_params(
+        reconvert_params = cad_convert_hints.reconvert_params(
             convert,
             page_index,
             hints=merged_hints,
             hatch_classes=cad_convert_hints.hatch_classes_of(convert),
         )
-        key = cad_service.idempotency_key(uuid.UUID(str(convert.payload["revision_id"])), params)
-        if await jobs_service.find_by_idempotency_key(session, idempotency_key=key) is None:
-            job = await cad_convert_hints.enqueue_reconvert(session, convert, params, settings)
+        key = cad_service.idempotency_key(uuid.UUID(revision_id_str), reconvert_params)
+        has_new_reconvert = (
+            await jobs_service.find_by_idempotency_key(session, idempotency_key=key) is None
+        )
+
+    if progress is not None and progress.status == "stagnated" and not has_open_false_wall:
+        _with_marker(review, stop_reason="engine_blocked")
+        v_walls, v_convert = await _resolve_best_for_verifier(
+            session, walls, convert, best_walls_id
+        )
+        await _start_verifier(session, v_walls, v_convert, pilot, settings)
+        return
+
+    if hints is not None and reconvert_params is not None:
+        if has_new_reconvert:
+            job = await cad_convert_hints.enqueue_reconvert(
+                session, convert, reconvert_params, settings
+            )
             _with_marker(
                 job,
                 reason="remarks",
@@ -628,7 +811,7 @@ async def _after_corrector(
             return
         # Те же подсказки уже были: повтор вернул бы то же задание, цикл не продвинется.
         log.warning("ai_loop_reconvert_same_hints", job_id=str(convert.id))
-    if any(row.status == _OPEN and row.type == "false_wall" for row in remarks):
+    if has_open_false_wall:
         try:
             rebuilt = await cad_walls.schedule_rebuild_by_remarks(
                 session, storage, walls_job=walls, settings=settings
@@ -639,4 +822,5 @@ async def _after_corrector(
             _with_marker(rebuilt, reason="false_wall", rebuild_of=str(review.id))
             return
     # Движку подсказывать нечего (прочие типы замечаний): итог за проверщиком.
-    await _start_verifier(session, walls, convert, pilot, settings)
+    v_walls, v_convert = await _resolve_best_for_verifier(session, walls, convert, best_walls_id)
+    await _start_verifier(session, v_walls, v_convert, pilot, settings)

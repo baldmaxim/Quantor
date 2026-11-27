@@ -37,7 +37,7 @@ from app.core.config import Settings
 from app.domain import JobStatus, JobType
 from app.errors import DomainError, ErrorCode
 from app.models import AiPromptVersion, DocumentRevision, Job, Project
-from app.services import ai_loop, cad, cad_remarks, jobs
+from app.services import ai_loop, cad, cad_ai_feedback, cad_remarks, jobs
 from app.services.cad_walls import WALLS_JSON
 from app.storage.base import ObjectStorage
 
@@ -305,6 +305,62 @@ async def _prepare(
         result["walls_sha256"],
         root / "walls.json",
     )
+    prev_diff: dict[str, Any] | None = None
+    if payload.get("role") == "corrector":
+        try:
+            current_walls = json.loads((root / "walls.json").read_bytes())
+            if isinstance(current_walls, dict) and job.project_id is not None:
+                prev_review: AiReviewResult | None = None
+                prev_walls_job: Job | None = None
+                prev_cad_job: Job | None = None
+                cad_job: Job | None = None
+                async with session.begin_nested():
+                    cad_job = await session.get(Job, uuid.UUID(payload["cad_job_id"]))
+                    chain = await ai_loop._chain_reviews(
+                        session,
+                        project_id=job.project_id,
+                        revision_id=str(revision_id),
+                        page_index=payload["page_index"],
+                        view=payload["view"],
+                    )
+                    for row in chain:
+                        if row.id == job.id or row.payload.get("role") != "corrector":
+                            continue
+                        raw_prev = row.payload.get("ai_review")
+                        if row.status is JobStatus.SUCCEEDED and isinstance(raw_prev, dict):
+                            prev_review = AiReviewResult.model_validate(raw_prev)
+                            prev_walls_job = await session.get(Job, prev_review.walls_job_id)
+                            prev_cad_job = await session.get(Job, prev_review.cad_job_id)
+                            break
+                curr_checks: dict[str, Any] | None = None
+                if cad_job is not None:
+                    curr_checks = await ai_loop._read_convert_checks(
+                        storage, cad_job, payload["page_index"], payload["view"]
+                    )
+                prev_walls: dict[str, Any] | None = None
+                prev_checks: dict[str, Any] | None = None
+                if prev_review is not None:
+                    if prev_walls_job is not None:
+                        prev_walls = await ai_loop._read_walls_json(
+                            storage, prev_walls_job, prev_review.page_index, prev_review.view
+                        )
+                    if prev_cad_job is not None:
+                        prev_checks = await ai_loop._read_convert_checks(
+                            storage, prev_cad_job, prev_review.page_index, prev_review.view
+                        )
+                prev_diff = cad_ai_feedback.build_prev_round_diff(
+                    current_walls,
+                    prev_walls,
+                    prev_review,
+                    convert_checks=curr_checks,
+                    prev_convert_checks=prev_checks,
+                )
+        except Exception:
+            log.warning("cad_ai_review_prev_round_diff_skipped", job_id=str(job.id), exc_info=True)
+    if prev_diff is not None:
+        (root / "prev_round_diff.json").write_text(
+            json.dumps(prev_diff, ensure_ascii=False), encoding="utf-8"
+        )
     prompt = await session.scalar(
         select(AiPromptVersion).where(
             AiPromptVersion.role == payload["role"], AiPromptVersion.status == "active"
