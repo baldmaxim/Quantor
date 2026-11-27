@@ -674,6 +674,7 @@ export const useWorkspaceCad = ({
     constructions: constructionsState.layers,
     zones: zonesState.layers,
     sections: sectionsState.layers,
+    remarks: remarks.layers,
     tender: tender.layers,
   };
 

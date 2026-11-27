@@ -49,6 +49,9 @@ export interface IWorkspaceCadRemarks {
   readonly onActivate: (id: string | null) => void;
   readonly onFocusCamera: (state: CameraState) => void;
   readonly viewport: () => Viewport;
+  /** Рамки замечаний рисуются на листе. */
+  readonly marksVisible?: boolean;
+  readonly onMarksVisibleChange?: (visible: boolean) => void;
 }
 
 /** Назначение шаблона отделки зонам из списка зон (ADR-0042). */
@@ -319,6 +322,11 @@ export interface IWorkspaceCadLayers {
   readonly zones?: ICadZoneLayers | null;
   /** Разметка разрезов на листе (вкл/выкл); `null` или нет - переключателя нет (разрезов нет). */
   readonly sections?: {
+    readonly visible: boolean;
+    readonly onVisibleChange: (visible: boolean) => void;
+  } | null;
+  /** Рамки замечаний на листе (вкл/выкл); `null` или нет - замечаний на виде нет. */
+  readonly remarks?: {
     readonly visible: boolean;
     readonly onVisibleChange: (visible: boolean) => void;
   } | null;

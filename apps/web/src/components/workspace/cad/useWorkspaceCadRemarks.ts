@@ -4,15 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useCadRemarks, type IRemarkDraft } from '@/components/cad/viewer/useCadRemarks';
 import type { BboxPt, IRemarkBinding } from '@/lib/cad/remarks';
+import type { IRemarkMark } from '@/lib/cad/remarks-painter';
+import { useStoredBoolean } from '@/lib/cad/useStoredBoolean';
 import {
   IDLE_REMARK_BINDING,
   WORKSPACE_DRAFT_ID,
   workspaceMarks,
 } from '@/lib/cad/workspace-cad';
-import type { IRemarkMark } from '@/lib/cad/remarks-painter';
 import type { Camera, Viewport } from '@/lib/viewer/camera';
 
 import type { IWorkspaceCadRemarks } from './types';
+
+const REMARKS_VISIBLE_KEY = 'quantor.cad.remarks-visible';
 
 interface IInput {
   binding: IRemarkBinding | null;
@@ -32,6 +35,11 @@ export interface IWorkspaceCadRemarksState {
   /** Режим отметки включён: поверх холста нужен слой захвата рамки. */
   readonly capturing: boolean;
   readonly onDrawn: (bbox: BboxPt) => void;
+  /** Переключатель показа рамок замечаний в «Слоях»; `null` - замечаний на виде нет. */
+  readonly layers: {
+    readonly visible: boolean;
+    readonly onVisibleChange: (visible: boolean) => void;
+  } | null;
 }
 
 /** Замечания вида: отметка участка, черновик, выбранное замечание и рамки на листе. */
@@ -43,6 +51,7 @@ export const useWorkspaceCadRemarks = ({
   active,
 }: IInput): IWorkspaceCadRemarksState => {
   const store = useCadRemarks(binding ?? IDLE_REMARK_BINDING, binding !== null);
+  const [marksVisible, setMarksVisible] = useStoredBoolean(REMARKS_VISIBLE_KEY, true);
 
   const [marking, setMarking] = useState(false);
   const [draft, setDraft] = useState<BboxPt | null>(null);
@@ -74,10 +83,14 @@ export const useWorkspaceCadRemarks = ({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [markingOn]);
 
-  const marks = useMemo(
-    () => (active ? workspaceMarks(store.remarks, draft, pageSize) : []),
-    [active, store.remarks, draft, pageSize],
-  );
+  const marks = useMemo(() => {
+    if (!active) return [];
+    if (marksVisible) return workspaceMarks(store.remarks, draft, pageSize);
+    if (draft === null) return [];
+    return workspaceMarks(store.remarks, draft, pageSize).filter(
+      (mark) => mark.id === WORKSPACE_DRAFT_ID,
+    );
+  }, [active, marksVisible, store.remarks, draft, pageSize]);
 
   // Участок нарисован: режим отметки гаснет, чтобы лист снова можно было двигать.
   const onDrawn = (bbox: BboxPt) => {
@@ -108,6 +121,8 @@ export const useWorkspaceCadRemarks = ({
         onActivate: setActiveRemark,
         onFocusCamera: (state) => camera.set(state),
         viewport: viewportSize,
+        marksVisible,
+        onMarksVisibleChange: setMarksVisible,
       }
     : null;
 
@@ -117,5 +132,9 @@ export const useWorkspaceCadRemarks = ({
     activeId: draft ? WORKSPACE_DRAFT_ID : activeRemark,
     capturing: markingOn && pageSize !== null,
     onDrawn,
+    layers:
+      store.remarks.length > 0
+        ? { visible: marksVisible, onVisibleChange: setMarksVisible }
+        : null,
   };
 };

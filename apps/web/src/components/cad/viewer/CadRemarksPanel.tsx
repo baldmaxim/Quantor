@@ -35,6 +35,9 @@ interface ICadRemarksPanelProps {
   /** Состояние камеры по прямоугольнику; `null` - «К участку» недоступно (листа или области нет). */
   onFocusCamera: ((state: CameraState) => void) | null;
   viewport: () => Viewport;
+  /** Рамки замечаний рисуются на листе. */
+  marksVisible?: boolean;
+  onMarksVisibleChange?: (visible: boolean) => void;
 }
 
 /** Раздел «Замечания» панели вида: отметка участка, список, обмен JSON. */
@@ -52,6 +55,8 @@ export const CadRemarksPanel: FC<ICadRemarksPanelProps> = ({
   onActivate,
   onFocusCamera,
   viewport,
+  marksVisible = true,
+  onMarksVisibleChange,
 }) => {
   const { remarks } = store;
 
@@ -100,6 +105,17 @@ export const CadRemarksPanel: FC<ICadRemarksPanelProps> = ({
             <p className="text-xs text-muted" role="note">
               {markDisabledReason}
             </p>
+          )}
+          {onMarksVisibleChange && (
+            <label className="flex min-h-[32px] items-center gap-[var(--s-3)] text-xs max-md:min-h-[44px]">
+              <input
+                type="checkbox"
+                checked={marksVisible}
+                onChange={(event) => onMarksVisibleChange(event.target.checked)}
+                className="size-4 shrink-0"
+              />
+              Рамки замечаний на листе
+            </label>
           )}
         </div>
 

@@ -56,6 +56,8 @@ interface ICadLayersPanelProps {
   zones?: ICadZoneLayers | null;
   /** Разметка разрезов на листе (вкл/выкл); нет - на листе разрезов нет. */
   sections?: { visible: boolean; onVisibleChange: (visible: boolean) => void } | null;
+  /** Рамки замечаний на листе (вкл/выкл); нет - замечаний на виде нет. */
+  remarks?: { visible: boolean; onVisibleChange: (visible: boolean) => void } | null;
   /** Группа «Расчёты» (TENDER): версии расчётов на виде; нет - группы нет. */
   tender?: ICadTenderLayers | null;
   /** Трассы механики выбранного route-задания; нет - группы нет. */
@@ -110,6 +112,7 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
   constructions = null,
   zones = null,
   sections = null,
+  remarks = null,
   tender = null,
   mep = null,
 }) => {
@@ -181,6 +184,21 @@ export const CadLayersPanel: FC<ICadLayersPanelProps> = ({
             Разметка разрезов
           </label>
           <p className="text-xs text-muted">Отметки, полосы и размеры уровней на листе-разрезе</p>
+        </div>
+      )}
+
+      {remarks && (
+        <div className="flex min-w-0 flex-col">
+          <label className={CHECK}>
+            <input
+              type="checkbox"
+              checked={remarks.visible}
+              onChange={(event) => remarks.onVisibleChange(event.target.checked)}
+              className="size-5 shrink-0"
+            />
+            Рамки замечаний
+          </label>
+          <p className="text-xs text-muted">Выделенные участки и номера замечаний на листе</p>
         </div>
       )}
 

@@ -216,4 +216,21 @@ describe('CadLayersPanel', () => {
     mount({ layers: [], cadShown: false, previewAvailable: false });
     expect(screen.getByRole('checkbox', { name: 'Распознанные блоки' })).toBeChecked();
   });
+
+  it('флажок «Рамки замечаний» скрыт, если remarks не передан или null', () => {
+    mount();
+    expect(screen.queryByRole('checkbox', { name: 'Рамки замечаний' })).toBeNull();
+    mount({ remarks: null });
+    expect(screen.queryByRole('checkbox', { name: 'Рамки замечаний' })).toBeNull();
+  });
+
+  it('флажок «Рамки замечаний» рендерится и вызывает onVisibleChange', () => {
+    const onVisibleChange = vi.fn();
+    mount({ remarks: { visible: true, onVisibleChange } });
+    const box = screen.getByRole('checkbox', { name: 'Рамки замечаний' });
+    expect(box).toBeChecked();
+    expect(screen.getByText('Выделенные участки и номера замечаний на листе')).toBeInTheDocument();
+    fireEvent.click(box);
+    expect(onVisibleChange).toHaveBeenCalledWith(false);
+  });
 });
