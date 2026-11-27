@@ -421,6 +421,8 @@ class TestNoQueryGrowth:
         await db_session.commit()
 
         async with build_api(_engineer(workspace_id)) as client:
+            # Прогрев: кеш переопределений флагов заполняется первым запросом.
+            await client.get(f"/api/v1/sheets/{sheet.id}/quantities")
             with count_queries(db_engine) as few:
                 await client.get(f"/api/v1/sheets/{sheet.id}/quantities")
 

@@ -414,7 +414,8 @@ def test_floor3d_without_answer_builds_to_sheet_height_and_warns() -> None:
 def test_floor3d_without_partition_context_is_unchanged() -> None:
     model = build_3d(None)
     assert wall_of(model).z_top_mm == BASE + 2800
-    assert {w.code for w in model.warnings} == set()
+    # Непроверенные отверстия плиты — штатное предупреждение любой модели, не маячного ряда.
+    assert {w.code for w in model.warnings} == {"slab_holes_unreviewed"}
 
 
 # ------------------------------------------------------------------ проём над стеной санузла

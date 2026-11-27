@@ -74,6 +74,10 @@ class TestStageBoundaries:
         3D DXF — детерминированные скрипты в исполнителе CAD, моделей не вызывают. Контур
         согласованности (ADR-0043) добавил паспорт листа, вопросы к документации, ведомости листов
         и совмещение планов: текстовый слой PDF и итоги CAD, без модели, OCR и растра.
+        Проверка обводки,
+        фасады и предпросмотр стиля — детерминированные скрипты исполнителя CAD;
+        `cad_ai_review` и `cad_ai_vor_map` (ИИ-петля, ADR-0056) идут через внешний CLI
+        вне процесса API, а `model_ifc_import` читает IFC без модели.
         """
         assert [job_type.value for job_type in JobType] == [
             "legacy_import",
@@ -81,10 +85,16 @@ class TestStageBoundaries:
             "cad_pdf_convert",
             "cad_mep_route",
             "cad_walls",
+            "cad_outline_review",
+            "cad_ai_review",
+            "cad_ai_vor_map",
             "cad_floor3d_dxf",
             "cad_zones",
             "cad_sections",
+            "cad_facades",
+            "cad_style_preview",
             "cad_eom_route",
+            "model_ifc_import",
             "sheet_passport_extract",
             "doc_questions_search",
             "sheet_register_extract",

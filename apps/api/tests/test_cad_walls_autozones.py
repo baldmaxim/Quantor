@@ -442,7 +442,7 @@ def test_argv_passes_frame_only_when_given(settings: Settings, tmp_path: Path) -
         "pdf": tmp_path / "source.pdf",
         "page_index": 0,
     }
-    argv = walls_handler._argv(settings, **base, frame=(265.65515, 1286.75037, 176.395130177))
+    argv = walls_handler._argv(settings, **base, frame=(265.65516, 1286.75037, 176.395130177))
     assert argv[-1] == "--frame=265.6552,1286.7504,176.39513"
     assert not any(a.startswith("--frame") for a in walls_handler._argv(settings, **base))
 

@@ -150,8 +150,9 @@ class TestNoQueryGrowth:
             )
 
         assert response.json()["total"] == 40
-        # Счётчик областей на лист — подзапрос, а не отдельное обращение на каждый лист.
-        assert len(statements) <= 4, f"на 40 листов ушло {len(statements)} запросов"
+        # Счётчик областей и названия из паспортов листов — по одному пакетному запросу на страницу,
+        # а не отдельное обращение на каждый лист.
+        assert len(statements) <= 5, f"на 40 листов ушло {len(statements)} запросов"
 
 
 class TestPagination:

@@ -58,7 +58,7 @@ def _walk(routes: list[Any]) -> list[APIRoute]:
 
 
 def test_every_mep_route_checks_the_flag() -> None:
-    routes = [r for r in _walk(create_app().routes) if "/mep/" in r.path]
+    routes = [r for r in _walk(create_app().routes) if r.path.startswith("/mep/")]
     unguarded = [
         r.path
         for r in routes

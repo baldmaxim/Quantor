@@ -904,7 +904,7 @@ def test_convert_hints_go_to_job_json_as_is(runner: ModuleType) -> None:
         ),
         _convert_hints(
             hints=[
-                {"id": str(n), "type": "missing_door", "bbox_pt": [0, 0, 1, 1]} for n in range(101)
+                {"id": str(n), "type": "missing_door", "bbox_pt": [0, 0, 1, 1]} for n in range(251)
             ]
         ),
     ],

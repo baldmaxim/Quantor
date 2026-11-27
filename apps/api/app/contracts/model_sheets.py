@@ -36,7 +36,8 @@ class ModelSheetOverlayRead(BaseModel):
     rms_mm: float | None = None
     max_mm: float | None = None
     axes_used: list[str] = []
-    # Подписи осей, общие с моделью, но стоящие на листе не там, где в модели (отброшены при подгонке).
+    # Подписи осей, общие с моделью, но стоящие на листе не там, где в модели
+    # (отброшены при подгонке).
     axes_rejected: list[str] = []
 
 

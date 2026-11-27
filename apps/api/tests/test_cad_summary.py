@@ -188,6 +188,8 @@ async def test_summary_counts_sheets_of_the_latest_openable_revisions(
         pid = uuid.UUID(project_id)
         # Старая ревизия документа и её работа в сводку не входят.
         old = await add_pdf(db_session, fake_storage, project_id, "АР План.pdf")
+        # Явная дата: иначе ревизия «сейчас» оказывается новее ревизии BASE + 1 день.
+        old.created_at = BASE
         add_sheets(db_session, old.id, ["План 1 этажа"])
         convert_job(
             db_session,

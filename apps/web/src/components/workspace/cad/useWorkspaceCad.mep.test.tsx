@@ -119,6 +119,7 @@ vi.mock('@/lib/cad/constructions-queries', async (importOriginal) => ({
   }),
   useRecomputeCadWalls: () => ({ mutate: vi.fn(), isPending: false }),
   useRebuildCadWallsByRemarks: () => ({ mutate: vi.fn(), isPending: false }),
+  useReconvertCadViewByRemarks: () => ({ mutate: vi.fn(), isPending: false }),
   useSaveConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
   useBulkConstructionProps: () => ({ mutate: vi.fn(), isPending: false }),
   useSaveSheetLevels: () => ({ mutate: vi.fn(), isPending: false }),
