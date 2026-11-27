@@ -17,8 +17,8 @@ from app.models import AuthSession, UserIdentity
 from tests.conftest import clean_settings
 from tests.test_local_auth import _approved_user, _local, _login
 
-IDLE = 12 * 3600
-MAX_LIFETIME = 30 * 24 * 3600
+IDLE = 400 * 24 * 3600  # умолчание auth_session_ttl_seconds
+MAX_LIFETIME = 10 * 365 * 24 * 3600  # умолчание auth_session_max_lifetime_seconds
 
 
 async def _transient_row(

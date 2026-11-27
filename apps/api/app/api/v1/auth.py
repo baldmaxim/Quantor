@@ -485,7 +485,9 @@ async def read_session(
             domain=settings.auth_cookie_domain or None,
             secure=settings.auth_cookie_secure,
             samesite=settings.auth_cookie_samesite,
-            max_age=settings.auth_session_ttl_seconds,
+            max_age=min(
+                settings.auth_session_ttl_seconds, settings.auth_session_max_lifetime_seconds
+            ),
         )
 
     credential = await session.get(LocalCredential, user.id)
