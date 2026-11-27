@@ -1,6 +1,7 @@
 """Очередь CAD проекта: задания проекта, место в очереди исполнителя и общие счётчики.
 
-Исполнитель CAD берёт задания по одному в порядке `(available_at, created_at)` (`CLAIM_SQL`),
+Исполнитель CAD берёт задания по одному в порядке `(ранг типа, available_at, created_at)`
+(`CLAIM_SQL`, ранг - `domain.job_claim_rank`),
 поэтому «впереди» задания - всё, что сейчас выполняется, и всё, что стоит в очереди раньше.
 Чужие пространства видны только числами: в `ahead` и общих счётчиках, но не в списке.
 """
@@ -11,12 +12,12 @@ import uuid
 from datetime import timedelta
 from typing import Any, Final
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import ColumnElement, case, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from app.contracts.cad_queue import CadQueueItemRead, CadQueueRead
-from app.domain import JobStatus, JobType
+from app.domain import HEAVY_JOB_TYPES, URGENT_JOB_TYPES, JobStatus, JobType, job_claim_rank
 from app.models import Document, DocumentRevision, Job
 
 # Типы, которые берёт исполнитель CAD (ключи `app.cad_worker.HANDLERS`).
@@ -35,6 +36,15 @@ QUEUE_JOB_TYPES: Final = (
 RECENT_FINISHED_WINDOW: Final = timedelta(hours=1)
 RECENT_FINISHED_LIMIT: Final = 10
 _TERMINAL: Final = (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED)
+
+
+def _claim_rank(job_type: InstrumentedAttribute[JobType]) -> ColumnElement[int]:
+    """Ранг захвата в SQL - то же, что `domain.job_claim_rank` и `CLAIM_SQL`."""
+    return case(
+        (job_type.in_(URGENT_JOB_TYPES), 0),
+        (job_type.in_(HEAVY_JOB_TYPES), 2),
+        else_=1,
+    )
 
 
 def _ints(raw: object) -> list[int]:
@@ -85,8 +95,8 @@ async def _project_jobs(
         .where(
             earlier.job_type.in_(QUEUE_JOB_TYPES),
             earlier.status == JobStatus.QUEUED,
-            tuple_(earlier.available_at, earlier.created_at)
-            < tuple_(Job.available_at, Job.created_at),
+            tuple_(_claim_rank(earlier.job_type), earlier.available_at, earlier.created_at)
+            < tuple_(_claim_rank(Job.job_type), Job.available_at, Job.created_at),
         )
         .correlate(Job)
         .scalar_subquery()
@@ -109,7 +119,9 @@ async def _project_jobs(
         else:
             queued.append((job, running_total + int(before or 0)))
     running.sort(key=lambda row: (row[0].started_at is None, row[0].started_at, row[0].created_at))
-    queued.sort(key=lambda row: (row[0].available_at, row[0].created_at))
+    queued.sort(
+        key=lambda row: (job_claim_rank(row[0].job_type), row[0].available_at, row[0].created_at)
+    )
 
     finished = await session.scalars(
         select(Job)

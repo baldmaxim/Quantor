@@ -12807,6 +12807,109 @@
         "title": "CadScaleControlRead",
         "type": "object"
       },
+      "CadScaleNeededItem": {
+        "properties": {
+          "convert_job_id": {
+            "format": "uuid",
+            "title": "Convert Job Id",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "page_index": {
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "reason": {
+            "enum": [
+              "auto_scale_unconfirmed",
+              "scale_missing",
+              "rerun_needed"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "sheet_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Position"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          }
+        },
+        "required": [
+          "document_id",
+          "document_title",
+          "revision_id",
+          "page_index",
+          "page_label",
+          "sheet_position",
+          "reason",
+          "convert_job_id",
+          "view"
+        ],
+        "title": "CadScaleNeededItem",
+        "type": "object"
+      },
+      "CadScaleNeededRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CadScaleNeededItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "CadScaleNeededRead",
+        "type": "object"
+      },
       "CadScaleRead": {
         "description": "Проверка масштаба движком: подбор по размерным цепочкам и независимая проверка.",
         "properties": {
@@ -51900,6 +52003,49 @@
         "summary": "Листы ревизии с непустым реестром стояков (источники копирования)",
         "tags": [
           "cad-risers"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/scale-needed": {
+      "get": {
+        "operationId": "read_cad_scale_needed",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CadScaleNeededRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Листы CAD проекта, которым нужен масштаб: ручная калибровка",
+        "tags": [
+          "cad-pipeline"
         ]
       }
     },

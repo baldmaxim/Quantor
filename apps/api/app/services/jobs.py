@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import JobStatus, JobType
+from app.domain import HEAVY_JOB_TYPES, URGENT_JOB_TYPES, JobStatus, JobType
 from app.errors import DomainError, ErrorCode
 from app.models import Job, Project
 
@@ -316,7 +316,10 @@ CLAIM_SQL = text(
          where status = 'queued'
            and job_type = any(:job_types)
            and available_at <= now()
-         order by available_at, created_at
+         order by case when job_type = any(:urgent_types) then 0
+                       when job_type = any(:heavy_types) then 2
+                       else 1 end,
+                  available_at, created_at
          limit 1
          for update skip locked
     )
@@ -338,12 +341,21 @@ async def claim(
     одновременно, не встают в очередь друг за другом и не берут одно и то же. Второй
     просто пропускает занятую строку и смотрит следующую.
 
-    Порядок `available_at, created_at`, а не только `created_at`: иначе отсрочка повтора
-    игнорируется и упавшее задание берут снова немедленно.
+    Порядок `(ранг типа, available_at, created_at)`. Ранг (`domain.job_claim_rank`): короткие
+    дочерние CAD-задания (cad_walls, зоны, трассы) идут раньше длинных преобразований листов,
+    иначе секундная работа стоит в очереди десятки минут за cad_pdf_convert. Внутри ранга FIFO.
+    `available_at` в порядке, а не только `created_at`: иначе отсрочка повтора игнорируется и
+    упавшее задание берут снова немедленно.
     """
     claimed = await session.scalar(
         CLAIM_SQL,
-        {"worker_id": worker_id, "job_types": job_types, "lease_seconds": lease_seconds},
+        {
+            "worker_id": worker_id,
+            "job_types": job_types,
+            "lease_seconds": lease_seconds,
+            "urgent_types": [item.value for item in URGENT_JOB_TYPES],
+            "heavy_types": [item.value for item in HEAVY_JOB_TYPES],
+        },
     )
     if claimed is None:
         return None

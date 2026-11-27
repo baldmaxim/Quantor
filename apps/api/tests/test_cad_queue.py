@@ -186,21 +186,64 @@ async def test_queue_order_ahead_and_foreign_jobs(
         items = body["items"]
         assert [item["job_id"] for item in items] == [
             str(running.id),
-            str(first.id),
             str(later.id),
+            str(first.id),
         ]
-        run_item, first_item, later_item = items
+        run_item, later_item, first_item = items
         assert (run_item["status"], run_item["ahead"]) == ("running", None)
         assert (run_item["attempt"], run_item["max_attempts"]) == (2, 3)
         assert run_item["pages"] == [7] and run_item["job_type"] == "cad_sections"
         assert run_item["document_name"] == "АР План.pdf"
         assert run_item["revision_id"] == str(revision.id)
         assert run_item["document_id"] is not None
-        # Перед первым: два выполняющихся (мой и чужой) и чужое queued на минуте 1.
-        assert first_item["ahead"] == 3 and first_item["pages"] == [0, 4]
-        # Перед вторым: те же и моё на минуте 2.
-        assert later_item["ahead"] == 4 and later_item["pages"] == [3]
+        # cad_walls (срочное) обгоняет конвертацию: впереди только два выполняющихся.
+        assert later_item["ahead"] == 2 and later_item["pages"] == [3]
+        # Перед конвертацией: два выполняющихся, срочное cad_walls и чужая конвертация на минуте 1.
+        assert first_item["ahead"] == 4 and first_item["pages"] == [0, 4]
         assert later_item["job_type"] == "cad_walls"
+
+
+async def test_queued_order_and_ahead_follow_the_claim_rank(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    workspace_id: uuid.UUID,
+) -> None:
+    """Порядок и `ahead` по рангу захвата: срочное позже по времени идёт раньше тяжёлого."""
+    async with build_api(make_context(), settings=queue_settings()) as api:
+        project_id = await make_project(api)
+        pid = uuid.UUID(project_id)
+        heavy = add_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=pid,
+            status=JobStatus.QUEUED,
+            minutes=0,
+        )
+        urgent_early = add_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=pid,
+            status=JobStatus.QUEUED,
+            job_type=JobType.CAD_WALLS,
+            minutes=10,
+        )
+        urgent_late = add_job(
+            db_session,
+            workspace_id=workspace_id,
+            project_id=pid,
+            status=JobStatus.QUEUED,
+            job_type=JobType.CAD_ZONES,
+            minutes=20,
+        )
+        await db_session.commit()
+
+        items = (await api.get(queue_url(project_id))).json()["items"]
+        assert [item["job_id"] for item in items] == [
+            str(urgent_early.id),
+            str(urgent_late.id),
+            str(heavy.id),
+        ]
+        assert [item["ahead"] for item in items] == [0, 1, 2]
 
 
 async def test_finished_window_and_limit(

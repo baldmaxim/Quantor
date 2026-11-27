@@ -6250,6 +6250,62 @@ export type CadScaleControlRead = {
 };
 
 /**
+ * CadScaleNeededItem
+ */
+export type CadScaleNeededItem = {
+    /**
+     * Convert Job Id
+     */
+    convert_job_id: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Reason
+     */
+    reason: 'auto_scale_unconfirmed' | 'scale_missing' | 'rerun_needed';
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * Sheet Position
+     */
+    sheet_position: number | null;
+    /**
+     * View
+     */
+    view: string | null;
+};
+
+/**
+ * CadScaleNeededRead
+ */
+export type CadScaleNeededRead = {
+    /**
+     * Items
+     */
+    items: Array<CadScaleNeededItem>;
+    /**
+     * Total
+     */
+    total: number;
+};
+
+/**
  * CadScaleRead
  *
  * Проверка масштаба движком: подбор по размерным цепочкам и независимая проверка.
@@ -27406,6 +27462,36 @@ export type ListCadRisersSheetsResponses = {
 };
 
 export type ListCadRisersSheetsResponse = ListCadRisersSheetsResponses[keyof ListCadRisersSheetsResponses];
+
+export type ReadCadScaleNeededData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/scale-needed';
+};
+
+export type ReadCadScaleNeededErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadCadScaleNeededError = ReadCadScaleNeededErrors[keyof ReadCadScaleNeededErrors];
+
+export type ReadCadScaleNeededResponses = {
+    /**
+     * Successful Response
+     */
+    200: CadScaleNeededRead;
+};
+
+export type ReadCadScaleNeededResponse = ReadCadScaleNeededResponses[keyof ReadCadScaleNeededResponses];
 
 export type ReadCadSectionsData = {
     body?: never;

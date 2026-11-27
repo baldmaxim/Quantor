@@ -16,7 +16,10 @@ from app.api.v1.deps import AuthDep, SessionDep, SettingsDep, require, require_f
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
 from app.contracts.cad_pipeline import CadPipelineRead
-from app.services import cad_pins, cad_pipeline
+from app.contracts.cad_scale_needed import CadScaleNeededRead
+from app.errors import not_found
+from app.services import cad_pins, cad_pipeline, cad_scale_needed
+from app.services import projects as projects_service
 
 router = APIRouter(
     prefix="/projects/{project_id}/revisions/{revision_id}/cad",
@@ -48,6 +51,33 @@ async def read_cad_pipeline(
     )
 
 
+project_router = APIRouter(
+    prefix="/projects/{project_id}/cad",
+    tags=["cad-pipeline"],
+    dependencies=[require_feature("cad.export")],
+)
+
+
+@project_router.get(
+    "/scale-needed",
+    response_model=CadScaleNeededRead,
+    summary="Листы CAD проекта, которым нужен масштаб: ручная калибровка",
+    dependencies=[require(Permission.DOCUMENT_READ)],
+)
+async def read_cad_scale_needed(
+    project_id: uuid.UUID, session: SessionDep, context: AuthDep
+) -> CadScaleNeededRead:
+    project = await projects_service.get_project(
+        session, workspace_id=context.tenant, project_id=project_id
+    )
+    if project is None:
+        raise not_found("Проект")
+    return await cad_scale_needed.build_scale_needed(
+        session, workspace_id=context.tenant, project_id=project_id
+    )
+
+
 # Отдельная группа под общим требованием опознания; флаг пространства - на самом `router`.
 qa_router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_authenticated)])
 qa_router.include_router(router)
+qa_router.include_router(project_router)

@@ -9,6 +9,7 @@ import { AttentionButton } from '@/components/projects/attention/AttentionButton
 import { AttentionDialog } from '@/components/projects/attention/AttentionDialog';
 import { useAttentionQueue } from '@/components/projects/attention/useAttentionQueue';
 import { CadQueueCard } from '@/components/projects/CadQueueCard';
+import { CadScaleNeededCard } from '@/components/projects/CadScaleNeededCard';
 import { DocumentPipelinePanel } from '@/components/projects/DocumentPipelinePanel';
 import { DocumentSections } from '@/components/projects/DocumentSections';
 import { ProjectSteps } from '@/components/projects/ProjectSteps';
@@ -209,7 +210,10 @@ const ProjectPage = ({ params }: IPageProps) => {
           </div>
           {features[CAD_FEATURE] === true && (
             <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:flex lg:max-h-[36dvh] lg:min-h-0 lg:flex-col">
-              <CadQueueCard projectId={projectId} />
+              <CadScaleNeededCard projectId={projectId} />
+              <div className="min-w-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                <CadQueueCard projectId={projectId} />
+              </div>
             </div>
           )}
         </div>

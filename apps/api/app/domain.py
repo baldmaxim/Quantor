@@ -488,6 +488,42 @@ class JobType(StrEnum):
     PLAN_ALIGN = "plan_align"
 
 
+# Приоритет захвата заданий (ранг: меньше - раньше). Короткие дочерние CAD-задания (секунды-минута)
+# не должны стоять за длинными преобразованиями листов: порядок захвата -
+# `(ранг, available_at, created_at)`, внутри ранга по-прежнему FIFO. Схема таблицы не меняется:
+# ранг вычисляется из `job_type` на лету (`jobs.CLAIM_SQL`, `cad_queue`).
+URGENT_JOB_TYPES: frozenset[JobType] = frozenset(
+    {
+        JobType.CAD_WALLS,
+        JobType.CAD_ZONES,
+        JobType.CAD_SECTIONS,
+        JobType.CAD_FACADES,
+        JobType.CAD_EOM_ROUTE,
+        JobType.CAD_MEP_ROUTE,
+        JobType.CAD_FLOOR3D_DXF,
+        JobType.CAD_STYLE_PREVIEW,
+    }
+)  # ранг 0
+HEAVY_JOB_TYPES: frozenset[JobType] = frozenset(
+    {
+        JobType.CAD_PDF_CONVERT,
+        JobType.CAD_AI_REVIEW,
+        JobType.CAD_OUTLINE_REVIEW,
+        JobType.CAD_AI_VOR_MAP,
+        JobType.MODEL_IFC_IMPORT,
+    }
+)  # ранг 2; все прочие типы - ранг 1
+
+
+def job_claim_rank(job_type: str) -> int:
+    """Ранг захвата типа задания: 0 - срочное, 1 - обычное, 2 - тяжёлое."""
+    if job_type in URGENT_JOB_TYPES:
+        return 0
+    if job_type in HEAVY_JOB_TYPES:
+        return 2
+    return 1
+
+
 class JobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"

@@ -128,6 +128,81 @@ async def test_claim_respects_the_backoff(
     )
 
 
+async def _queued_of_type(
+    session: AsyncSession, workspace_id: uuid.UUID, job_type: JobType, *, age_minutes: int
+) -> Job:
+    """Задание заданного типа, поставленное `age_minutes` минут назад (`created_at` в базе)."""
+    project = await projects_service.create_project(
+        session, workspace_id=workspace_id, name=f"П-{job_type.value}-{age_minutes}"
+    )
+    job = await jobs_service.enqueue(
+        session, job_type=job_type, workspace_id=workspace_id, project_id=project.id
+    )
+    await session.execute(
+        text(
+            "update jobs set created_at = now() - make_interval(mins => :age),"
+            " available_at = now() - make_interval(mins => :age) where id = :id"
+        ),
+        {"age": age_minutes, "id": job.id},
+    )
+    await session.commit()
+    return job
+
+
+async def _claim_all_types(session: AsyncSession) -> Job | None:
+    return await jobs_service.claim(
+        session,
+        worker_id="w-1",
+        job_types=[JobType.CAD_PDF_CONVERT.value, JobType.CAD_WALLS.value],
+        lease_seconds=LEASE,
+    )
+
+
+async def test_urgent_job_goes_before_older_heavy_one(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    """Короткое cad_walls обгоняет более раннюю cad_pdf_convert; потом берётся convert."""
+    heavy = await _queued_of_type(db_session, workspace_id, JobType.CAD_PDF_CONVERT, age_minutes=30)
+    urgent = await _queued_of_type(db_session, workspace_id, JobType.CAD_WALLS, age_minutes=1)
+
+    first = await _claim_all_types(db_session)
+    second = await _claim_all_types(db_session)
+    await db_session.commit()
+
+    assert first is not None and first.id == urgent.id
+    assert second is not None and second.id == heavy.id
+
+
+async def test_same_rank_keeps_fifo(db_session: AsyncSession, workspace_id: uuid.UUID) -> None:
+    older = await _queued_of_type(db_session, workspace_id, JobType.CAD_WALLS, age_minutes=10)
+    newer = await _queued_of_type(db_session, workspace_id, JobType.CAD_WALLS, age_minutes=2)
+
+    first = await _claim_all_types(db_session)
+    second = await _claim_all_types(db_session)
+    await db_session.commit()
+
+    assert first is not None and first.id == older.id
+    assert second is not None and second.id == newer.id
+
+
+async def test_urgent_job_in_backoff_is_not_taken_early(
+    db_session: AsyncSession, workspace_id: uuid.UUID
+) -> None:
+    """Срочное с отсрочкой в будущем не берут раньше срока: берётся доступное тяжёлое."""
+    heavy = await _queued_of_type(db_session, workspace_id, JobType.CAD_PDF_CONVERT, age_minutes=5)
+    urgent = await _queued_of_type(db_session, workspace_id, JobType.CAD_WALLS, age_minutes=1)
+    await db_session.execute(
+        text("update jobs set available_at = now() + interval '1 hour' where id = :id"),
+        {"id": urgent.id},
+    )
+    await db_session.commit()
+
+    claimed = await _claim_all_types(db_session)
+    await db_session.commit()
+
+    assert claimed is not None and claimed.id == heavy.id
+
+
 async def test_claim_ignores_foreign_job_types(
     db_session: AsyncSession, workspace_id: uuid.UUID
 ) -> None:
