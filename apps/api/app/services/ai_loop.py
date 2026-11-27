@@ -14,9 +14,10 @@ convert/walls -> corrector (<= max_iterations на вид) -> needs_correction -
 corrector ready_for_human_review или круги исчерпаны -> verifier
 ```
 
-Круг считается по виду всей цепочки преобразований листа (ревизия, страница, вид), а не по
-одному заданию конструкций. Модель только классифицирует подписи и находит замечания; метры,
-площади и объёмы считает движок.
+Круг считается по виду цепочки преобразований листа (ревизия, страница, вид), а не по одному
+заданию конструкций. Цепочка начинается с последнего преобразования без подсказок (корень):
+проверки более старых прогонов того же вида в счёт кругов не входят. Модель только
+классифицирует подписи и находит замечания; метры, площади и объёмы считает движок.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from typing import Any, Final
 
 from fastapi import HTTPException
@@ -136,21 +138,55 @@ async def _style_jobs(session: AsyncSession, convert: Job, page_index: int) -> l
     return list(rows)
 
 
-async def _chain_reviews(
-    session: AsyncSession, *, project_id: uuid.UUID, revision_id: str, page_index: int, view: int
-) -> list[Job]:
-    """Проверки правщика и проверщика вида по всей цепочке преобразований: новые первыми."""
+async def _chain_root(session: AsyncSession, convert: Job, page_index: int) -> Job | None:
+    """Корень цепочки: последнее преобразование страницы без подсказок не позже `convert`."""
+    if is_first_convert(convert):
+        return convert
+    revision_id = convert.payload.get("revision_id")
+    if revision_id is None:
+        return None
     rows = await session.scalars(
         select(Job)
         .where(
-            Job.job_type == JobType.CAD_AI_REVIEW,
-            Job.project_id == project_id,
-            Job.payload["role"].astext.in_(("corrector", "verifier")),
-            Job.payload["revision_id"].astext == revision_id,
-            Job.payload["page_index"].astext == str(page_index),
-            Job.payload["view"].astext == str(view),
+            Job.job_type == JobType.CAD_PDF_CONVERT,
+            Job.project_id == convert.project_id,
+            Job.workspace_id == convert.workspace_id,
+            Job.payload["revision_id"].astext == str(revision_id),
+            ~Job.payload["params"].has_key("convert_hints"),
+            Job.payload["params"]["pages"].contains([page_index]),
+            Job.created_at <= convert.created_at,
         )
         .order_by(Job.created_at.desc(), Job.id)
+        .limit(1)
+    )
+    return rows.first()
+
+
+async def _chain_reviews(
+    session: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    revision_id: str,
+    page_index: int,
+    view: int,
+    since: datetime | None = None,
+) -> list[Job]:
+    """Проверки правщика и проверщика вида по цепочке от корня (`since`): новые первыми.
+
+    `since` - время постановки корня цепочки (см. `_chain_root`); без него берётся вся история.
+    """
+    conditions = [
+        Job.job_type == JobType.CAD_AI_REVIEW,
+        Job.project_id == project_id,
+        Job.payload["role"].astext.in_(("corrector", "verifier")),
+        Job.payload["revision_id"].astext == revision_id,
+        Job.payload["page_index"].astext == str(page_index),
+        Job.payload["view"].astext == str(view),
+    ]
+    if since is not None:
+        conditions.append(Job.created_at >= since)
+    rows = await session.scalars(
+        select(Job).where(*conditions).order_by(Job.created_at.desc(), Job.id)
     )
     return list(rows)
 
@@ -394,12 +430,14 @@ async def _start_verifier(
     position = _view_of(walls)
     if position is None or walls.project_id is None:
         return None
+    root = await _chain_root(session, convert, position[0])
     reviews = await _chain_reviews(
         session,
         project_id=walls.project_id,
         revision_id=str(convert.payload.get("revision_id")),
         page_index=position[0],
         view=position[1],
+        since=root.created_at if root is not None else None,
     )
     verifiers = _of_role(reviews, "verifier")
     if any(job.payload.get("walls_job_id") == str(walls.id) for job in verifiers):
@@ -414,18 +452,23 @@ async def _start_verifier(
 async def _start_corrector(
     session: AsyncSession, walls: Job, convert: Job, pilot: AiLoopPilot, settings: Settings
 ) -> Job | None:
-    """Правщик по заданию конструкций; круги считаются по виду всей цепочки преобразований."""
+    """Правщик по заданию конструкций; круги по цепочке от последнего преобразования без подсказок.
+
+    Корень цепочки - `_chain_root`: проверки старых прогонов вида в счёт кругов не входят.
+    """
     from app.cad_worker import ai_review  # цикл: handler -> ai_loop -> ai_review
 
     position = _view_of(walls)
     if position is None or walls.project_id is None:
         return None
+    root = await _chain_root(session, convert, position[0])
     reviews = await _chain_reviews(
         session,
         project_id=walls.project_id,
         revision_id=str(convert.payload.get("revision_id")),
         page_index=position[0],
         view=position[1],
+        since=root.created_at if root is not None else None,
     )
     correctors = _of_role(reviews, "corrector")
     if any(job.payload.get("walls_job_id") == str(walls.id) for job in correctors):
@@ -649,12 +692,14 @@ async def _after_corrector(
     ):
         return
     revision_id_str = str(convert.payload.get("revision_id"))
+    root = await _chain_root(session, convert, page_index)
     reviews = await _chain_reviews(
         session,
         project_id=review.project_id,
         revision_id=revision_id_str,
         page_index=page_index,
         view=view,
+        since=root.created_at if root is not None else None,
     )
     progress: cad_ai_feedback.RoundProgress | None = None
     best_walls_id: uuid.UUID | None = walls.id

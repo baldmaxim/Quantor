@@ -40,6 +40,9 @@ MONOLITH = {
 }
 
 
+CHAIN_HINTS = {"schema": "quantor.cad_convert_hints.v1", "page": 1, "hints": []}
+
+
 def _settings(project_id: uuid.UUID, *, max_iterations: int = 3) -> Settings:
     pilot = AiLoopPilot(
         project_id=project_id, max_iterations=max_iterations, sources={"vor": "/pilot/vor.md"}
@@ -739,7 +742,7 @@ async def _chain(db_session: AsyncSession, ctx: _Ctx, rounds: int) -> tuple[Job,
     convert, walls, review = ctx.convert, await _walls(db_session, ctx.convert), None
     review = await _review(db_session, walls, "needs_correction", minutes=4)
     for number in range(1, rounds):
-        convert = await _convert(db_session, ctx, minutes=5 * number)
+        convert = await _convert(db_session, ctx, hints=CHAIN_HINTS, minutes=5 * number)
         walls = await _walls(db_session, convert)
         review = await _review(db_session, walls, "needs_correction", minutes=5 * number + 3)
     return convert, walls, review
@@ -755,13 +758,34 @@ async def test_rounds_are_counted_over_the_whole_convert_chain(
     ctx = await _context(db_session, fake_storage, build_api, workspace_id)
     settings = _settings(ctx.project_id, max_iterations=3)
     await _chain(db_session, ctx, 2)
-    last_convert = await _convert(db_session, ctx, minutes=40)
+    last_convert = await _convert(db_session, ctx, hints=CHAIN_HINTS, minutes=40)
     last = await _walls(db_session, last_convert)
     await ai_loop.after_walls(db_session, last, settings)
     await db_session.commit()
     correctors = await _reviews(db_session, "corrector")
     assert len(correctors) == 3
     assert max(job.payload["iteration"] for job in correctors) == 3
+
+
+async def test_rounds_start_over_from_the_new_root_without_hints(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    """Старый корень и два его правщика: у нового корня без подсказок круги считаются с первого."""
+    ctx = await _context(db_session, fake_storage, build_api, workspace_id)
+    settings = _settings(ctx.project_id, max_iterations=3)
+    await _chain(db_session, ctx, 2)
+    new_root = await _convert(db_session, ctx, minutes=40)
+    walls = await _walls(db_session, new_root)
+    await ai_loop.after_walls(db_session, walls, settings)
+    await db_session.commit()
+    correctors = await _reviews(db_session, "corrector")
+    assert len(correctors) == 3
+    fresh = [job for job in correctors if job.payload["walls_job_id"] == str(walls.id)]
+    assert [job.payload["iteration"] for job in fresh] == [1]
+    assert await _reviews(db_session, "verifier") == []
 
 
 async def test_exhausted_rounds_go_to_the_verifier_instead_of_a_new_rebuild(
@@ -779,7 +803,7 @@ async def test_exhausted_rounds_go_to_the_verifier_instead_of_a_new_rebuild(
     assert len(await _reviews(db_session, "verifier")) == 1
     assert len(await _jobs(db_session, JobType.CAD_PDF_CONVERT)) == 3
     # Новые конструкции при исчерпанных кругах: правщик не ставится.
-    extra = await _walls(db_session, await _convert(db_session, ctx, minutes=60))
+    extra = await _walls(db_session, await _convert(db_session, ctx, hints=CHAIN_HINTS, minutes=60))
     await ai_loop.after_walls(db_session, extra, settings)
     await db_session.commit()
     assert len(await _reviews(db_session, "corrector")) == 3
