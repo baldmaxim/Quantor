@@ -80,6 +80,13 @@ _COORDINATE_BRIDGE_NOTE: Final = (
 )
 
 
+def _slab_area_m2(floor: CadBuilding3dFloorRead) -> float | None:
+    """Площадь плиты листа: основной контур плюс остальные части многочастной плиты."""
+    areas = [_polygon_area_m2(ring) for ring in (floor.outline, *floor.outline_parts)]
+    known = [area for area in areas if area is not None]
+    return round(sum(known), 2) if known else None
+
+
 def _polygon_area_m2(ring: Sequence[Sequence[float]]) -> float | None:
     if len(ring) < 3:
         return None
@@ -316,7 +323,7 @@ def _placement_from(
         alignment=floor.alignment,
         alignment_axes=list(floor.alignment_axes),
         outline_source=floor.outline_source,
-        slab_area_m2=_polygon_area_m2(floor.outline) if floor.outline_source == "slab" else None,
+        slab_area_m2=_slab_area_m2(floor) if floor.outline_source == "slab" else None,
         windows_count=len(floor.windows or ()),
         level_zones_count=len(floor.levels),
         frame=frames_by_key.get(key),

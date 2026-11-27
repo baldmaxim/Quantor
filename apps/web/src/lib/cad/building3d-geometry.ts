@@ -22,6 +22,8 @@ export interface IBuildingFloorSpec {
   readonly floor: CadBuilding3dFloorRead;
   /** Контур в плане, м, от общего центра. */
   readonly shell: readonly Point2[];
+  /** Остальные части многочастной плиты (лист из двух корпусов), м, от общего центра; нет - плита одним контуром. */
+  readonly extraShells?: readonly (readonly Point2[])[];
   /** Высоты, м, от общего центра по высоте: низ плиты, верх плиты (= отметка этажа), верх объёма. */
   readonly slabBottom: number;
   readonly slabTop: number;
@@ -222,11 +224,15 @@ export const cleanOutline = (outline: readonly (readonly number[])[]): Point2[] 
 const positive = (value: number): number => (Number.isFinite(value) && value > 0 ? value : 0);
 
 export const buildBuildingPlan = (floors: readonly CadBuilding3dFloorRead[]): IBuildingPlan | null => {
-  const raw: { floor: CadBuilding3dFloorRead; outline: Point2[] }[] = [];
+  const raw: { floor: CadBuilding3dFloorRead; outline: Point2[]; extras: Point2[][] }[] = [];
   for (const floor of splitFloors(floors).known) {
     const outline = cleanOutline(floor.outline);
     if (outline === null || !Number.isFinite(floor.base_z_mm)) continue;
-    raw.push({ floor, outline });
+    const extras = (floor.outline_parts ?? []).flatMap((part) => {
+      const cleaned = cleanOutline(part);
+      return cleaned === null ? [] : [cleaned];
+    });
+    raw.push({ floor, outline, extras });
   }
   if (raw.length === 0) return null;
 
@@ -236,8 +242,8 @@ export const buildBuildingPlan = (floors: readonly CadBuilding3dFloorRead[]): IB
   let maxY = -Infinity;
   let minZ = Infinity;
   let maxZ = -Infinity;
-  for (const { floor, outline } of raw) {
-    for (const [x, y] of outline) {
+  for (const { floor, outline, extras } of raw) {
+    for (const [x, y] of [outline, ...extras].flat()) {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
@@ -248,10 +254,12 @@ export const buildBuildingPlan = (floors: readonly CadBuilding3dFloorRead[]): IB
   }
   const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 };
 
-  const specs: IBuildingFloorSpec[] = raw.map(({ floor, outline }) => ({
+  const toPlan = ([x, y]: Point2): Point2 => [(x - center.x) / MM_IN_M, (y - center.y) / MM_IN_M];
+  const specs: IBuildingFloorSpec[] = raw.map(({ floor, outline, extras }) => ({
     key: floorKey(floor),
     floor,
-    shell: outline.map(([x, y]): Point2 => [(x - center.x) / MM_IN_M, (y - center.y) / MM_IN_M]),
+    shell: outline.map(toPlan),
+    ...(extras.length > 0 ? { extraShells: extras.map((part) => part.map(toPlan)) } : {}),
     slabBottom: (floor.base_z_mm - positive(floor.slab_thickness_mm) - center.z) / MM_IN_M,
     slabTop: (floor.base_z_mm - center.z) / MM_IN_M,
     volumeTop: (floor.base_z_mm + positive(floor.floor_height_mm) - center.z) / MM_IN_M,

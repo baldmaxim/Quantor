@@ -34,6 +34,23 @@ def _parse_zone(raw: str | None) -> tuple[float, float, float, float] | None:
     return (parts[0], parts[1], parts[2], parts[3])
 
 
+def slab_rings(slab: Any) -> list[list[list[float]]]:
+    """Контуры плиты из блока `slab` walls.json: части `parts`, иначе единственный `shell`."""
+    if not isinstance(slab, dict):
+        return []
+    parts = slab.get("parts")
+    if isinstance(parts, list) and parts:
+        rings = [
+            part["shell"]
+            for part in parts
+            if isinstance(part, dict) and isinstance(part.get("shell"), list)
+        ]
+        if rings:
+            return rings
+    shell = slab.get("shell")
+    return [shell] if isinstance(shell, list) else []
+
+
 def render_slab_overlay(
     *,
     base_rgb: Any,
@@ -61,10 +78,10 @@ def render_slab_overlay(
     draw = pil_draw.Draw(layer)
     width, height = base.size
 
-    # 1. Плита перекрытия (`slab`) — полупрозрачный синий контур.
-    slab = walls.get("slab")
-    if isinstance(slab, dict) and isinstance(slab.get("shell"), list):
-        pts = to_px(slab["shell"])
+    # 1. Плита перекрытия (`slab`) — полупрозрачный синий контур; все части `slab.parts`
+    # (cad_walls v1.27), у старого файла без `parts` — один контур `shell`.
+    for slab_ring in slab_rings(walls.get("slab")):
+        pts = to_px(slab_ring)
         if len(pts) >= 3:
             draw.polygon(pts, fill=(0, 115, 230, 50), outline=(0, 70, 210, 235))
             draw.line([*pts, pts[0]], fill=(0, 70, 210, 245), width=3)

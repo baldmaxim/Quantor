@@ -107,3 +107,32 @@ describe('окна этажа в мешах просмотрщика', () => {
     expect(entry.meshes.has('glassCandidate')).toBe(false);
   });
 });
+
+const xRange = (mesh: { geometry: { computeBoundingBox: () => void; boundingBox: { min: { x: number }; max: { x: number } } | null } }) => {
+  mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox;
+  if (box === null) throw new Error('нет габарита');
+  return [box.min.x, box.max.x] as const;
+};
+
+describe('плита из нескольких частей в мешах просмотрщика', () => {
+  const bare = { ...FLOOR, walls: [], windows: null };
+
+  it('плита и объём строятся по всем частям', () => {
+    const { entry } = entryOf({ ...bare, outline_parts: [rect(14000, 0, 16000, 3000)] });
+    for (const part of ['slab', 'volume'] as const) {
+      const mesh = entry.meshes.get(part);
+      if (mesh === undefined) throw new Error(`нет меша ${part}`);
+      const [min, max] = xRange(mesh);
+      expect(max - min).toBeCloseTo(16);
+    }
+  });
+
+  it('без outline_parts - только основной контур', () => {
+    const { entry } = entryOf(bare);
+    const slab = entry.meshes.get('slab');
+    if (slab === undefined) throw new Error('нет плиты');
+    const [min, max] = xRange(slab);
+    expect(max - min).toBeCloseTo(10);
+  });
+});

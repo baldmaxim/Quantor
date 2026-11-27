@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { extrudeLevels, extrudeShell, mergeWalls, type IViewerFloorSpec } from './building-viewer-geometry';
+import { extrudeLevels, mergeShells, mergeWalls, type IViewerFloorSpec } from './building-viewer-geometry';
 
 /** Меши одного этажа просмотрщика объекта: плита, слитые стены по материалам, окна, объём. */
 
@@ -59,7 +59,7 @@ export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry 
   const slab =
     spec.levels.length > 0
       ? extrudeLevels(spec.levels, spec.slabTop - spec.slabBottom)
-      : extrudeShell(spec.shell, spec.slabBottom, spec.slabTop);
+      : mergeShells([spec.shell, ...(spec.extraShells ?? [])], spec.slabBottom, spec.slabTop);
   if (slab !== null) meshes.set('slab', makeMesh(slab, spec.key));
   for (const material of ['monolith', 'masonry'] as const) {
     const merged = mergeWalls(
@@ -72,7 +72,7 @@ export const buildFloor = (spec: IViewerFloorSpec, offset: number): IFloorEntry 
   }
   addWindows(meshes, spec);
   if (!meshes.has('monolith') && !meshes.has('masonry')) {
-    const volume = extrudeShell(spec.shell, spec.slabTop, spec.volumeTop);
+    const volume = mergeShells([spec.shell, ...(spec.extraShells ?? [])], spec.slabTop, spec.volumeTop);
     if (volume !== null) {
       const mesh = makeMesh(volume, spec.key);
       mesh.material.depthWrite = false;

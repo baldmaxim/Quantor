@@ -236,3 +236,20 @@ describe('здания и совмещение', () => {
     expect(sheetCountOf([floor(), floor({ typical_of: '5, 7 эт.' }), floor({ typical_of: null })])).toBe(2);
   });
 });
+
+describe('плита из нескольких частей в плане здания', () => {
+  it('остальные части идут в extraShells и входят в габарит и центр', () => {
+    const plan = buildBuildingPlan([floor({ outline_parts: [rect(14000, 0, 16000, 3000)] })]);
+    const spec = plan?.floors[0];
+    expect(plan?.center.x).toBe(8000);
+    expect(plan?.size.width).toBeCloseTo(16);
+    expect(spec?.extraShells).toHaveLength(1);
+    expect(spec?.extraShells?.[0]?.map(([u]) => u)).toEqual([6, 8, 8, 6]);
+  });
+
+  it('без outline_parts - плита одним контуром, extraShells нет', () => {
+    const spec = buildBuildingPlan([floor()])?.floors[0];
+    expect(spec?.extraShells).toBeUndefined();
+    expect(buildBuildingPlan([floor({ outline_parts: [] })])?.floors[0]?.extraShells).toBeUndefined();
+  });
+});

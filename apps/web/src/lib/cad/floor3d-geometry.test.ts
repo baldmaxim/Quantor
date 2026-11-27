@@ -251,3 +251,60 @@ describe('окна по фасаду', () => {
     ]);
   });
 });
+
+describe('плита из нескольких частей', () => {
+  const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+  const main = rect(0, 0, 10000, 6000);
+  const second = rect(14000, 0, 16000, 3000);
+  const holes = [
+    { key: 'a', shell: rect(1000, 1000, 2000, 2000), area_m2: 1, state: 'enabled' as const },
+    { key: 'b', shell: rect(14500, 500, 15000, 1000), area_m2: 0.25, state: 'enabled' as const },
+    { key: 'c', shell: rect(11000, 1000, 12000, 2000), area_m2: 1, state: 'enabled' as const },
+  ];
+  const multi = floor3dFixture({
+    bbox: [0, 0, 16000, 6000],
+    slab: {
+      shell: main,
+      parts: [main, second],
+      z_bottom_mm: 2800,
+      z_top_mm: 3000,
+      area_m2: 66,
+    },
+    slab_holes: holes,
+  });
+
+  it('обе части - одна призма плиты; отверстия вычитаются из той части, куда попадают', () => {
+    const plan = buildFloor3dPlan(multi);
+    const slabs = plan.prisms.filter((item) => item.category === 'slab');
+    expect(slabs).toHaveLength(1);
+    const [slab] = slabs;
+    expect(slab?.holes).toHaveLength(1);
+    expect(slab?.extraParts).toHaveLength(1);
+    expect(slab?.extraParts?.[0]?.holes).toHaveLength(1);
+    // Отверстие вне обеих частей не вычитается, но остаётся в списке отверстий плана.
+    expect(plan.holes.map((hole) => hole.key)).toEqual(['a', 'b', 'c']);
+    const xs = (slab?.extraParts?.[0]?.shell ?? []).map(([u]) => u);
+    expect(plan.center.x).toBe(8000);
+    expect(Math.max(...xs)).toBeCloseTo(8);
+    expect(plan.slabCap?.extraParts).toHaveLength(1);
+  });
+
+  it('без parts - плита как раньше: одна часть, все отверстия в ней', () => {
+    const plan = buildFloor3dPlan(floor3dFixture());
+    const slab = plan.prisms.find((item) => item.category === 'slab');
+    expect(slab?.extraParts).toBeUndefined();
+    expect(slab?.holes).toHaveLength(2);
+  });
+
+  it('parts из одной основной части не создаёт лишних частей', () => {
+    const plan = buildFloor3dPlan(
+      floor3dFixture({ slab: { shell: main, parts: [main], z_bottom_mm: 2800, z_top_mm: 3000, area_m2: 60 } }),
+    );
+    expect(plan.prisms.find((item) => item.category === 'slab')?.extraParts).toBeUndefined();
+  });
+});

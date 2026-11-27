@@ -369,6 +369,7 @@ def build_floor3d(
             )
         slab = CadFloor3dSlabRead(
             shell=extras.slab.shell,
+            parts=extras.slab.rings,
             z_bottom_mm=None if thickness is None else base - thickness,
             z_top_mm=base,
             area_m2=round(extras.slab.area_mm2 / _MM2_IN_M2, 3),
@@ -624,7 +625,7 @@ def build_floor3d(
 
     rings: list[Sequence[Sequence[float]]] = [item.polygon.shell for item in wall_items]
     if extras.slab is not None:
-        rings.append(extras.slab.shell)
+        rings.extend(extras.slab.rings)
     return CadFloor3dRead(
         units="mm",
         generator=document.generator,

@@ -456,3 +456,53 @@ def test_render_slab_overlay_draws_slab_holes_levels_openings_and_grid(tmp_path:
     assert rendered.size == (600, 400)
     # Изображение не осталось пустым белым (наложены плита, отверстие, проём и сетка).
     assert rendered.getextrema() != ((255, 255), (255, 255), (255, 255))
+
+
+def test_slab_rings_take_all_parts_or_fall_back_to_shell() -> None:
+    from app.cad_worker.view_render_cli import slab_rings
+
+    first = [[0.0, 0.0], [1000.0, 0.0], [1000.0, 1000.0]]
+    second = [[5000.0, 0.0], [6000.0, 0.0], [6000.0, 1000.0]]
+    both = {"shell": first, "parts": [{"shell": first}, {"shell": second}]}
+    assert slab_rings(both) == [first, second]
+    assert slab_rings({"shell": first}) == [first]
+    assert slab_rings({"shell": first, "parts": []}) == [first]
+    assert slab_rings(None) == []
+
+
+def test_render_slab_overlay_draws_every_slab_part(tmp_path: Path) -> None:
+    pytest.importorskip("PIL")
+    pil_image: Any = importlib.import_module("PIL.Image")
+
+    from app.cad_worker.view_render_cli import render_slab_overlay
+
+    first = [[0.0, 0.0], [3000.0, 0.0], [3000.0, 3000.0], [0.0, 3000.0]]
+    second = [[8000.0, 0.0], [10000.0, 0.0], [10000.0, 3000.0], [8000.0, 3000.0]]
+
+    def second_part_pixel(slab: dict[str, Any]) -> tuple[int, int, int]:
+        out_path = tmp_path / f"slab_{len(slab)}.png"
+        render_slab_overlay(
+            base_rgb=pil_image.new("RGB", (600, 400), (255, 255, 255)),
+            walls={"slab": slab},
+            frame=(10.0, 180.0, 25.0),
+            zoom=1.0,
+            pix_x=0,
+            pix_y=0,
+            out_path=out_path,
+        )
+        # Центр второй части: x = 10 + 9000/25 = 370, y = 180 - 1500/25 = 120.
+        pixel: tuple[int, int, int] = pil_image.open(out_path).convert("RGB").getpixel((370, 120))
+        return pixel
+
+    assert second_part_pixel({"shell": first}) == (255, 255, 255)
+    two_parts = {"shell": first, "parts": [{"shell": first}, {"shell": second}]}
+    assert second_part_pixel(two_parts) != (255, 255, 255)
+
+
+def test_slab_area_sums_extra_outline_parts() -> None:
+    floor = _floor(revision_id=uuid.uuid4(), page_index=0)
+    assert cad_project_context._slab_area_m2(floor) == 50.0
+    two = floor.model_copy(
+        update={"outline_parts": [[[20000.0, 0.0], [22000.0, 0.0], [22000.0, 3000.0]]]}
+    )
+    assert cad_project_context._slab_area_m2(two) == 53.0

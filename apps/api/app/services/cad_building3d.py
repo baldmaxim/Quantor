@@ -56,7 +56,12 @@ from app.contracts.cad_constructions import (
     WallsDocument,
     WallsOpening,
 )
-from app.contracts.cad_floor3d import WallsFloorExtras, WallsLevels, WallsOpeningExtras
+from app.contracts.cad_floor3d import (
+    WallsFloorExtras,
+    WallsLevels,
+    WallsOpeningExtras,
+    WallsSlab,
+)
 from app.domain import JobStatus, JobType
 from app.models import Document, DocumentRevision, Job, Sheet, SheetPassport
 from app.services import cad as cad_service
@@ -91,6 +96,12 @@ DEFAULT_SLAB_THICKNESS_MM: Final = 200
 AXIS_TOLERANCE_MM: Final = 150.0
 # Минимальная доля перекрытия bbox совмещённого этажа с эталоном (от меньшего bbox).
 MIN_ALIGN_OVERLAP: Final = 0.3
+# Единственная общая марка по направлению (при двух и более осях у обоих этажей) - слабая опора
+# (на листе её могли прочитать с ошибкой): сдвиг принимается, только если после него габариты
+# этажей почти совпадают.
+SINGLE_AXIS_MIN_OVERLAP: Final = 0.85
+LABEL_DIRECTION_VERTICAL: Final = "верт."
+LABEL_DIRECTION_HORIZONTAL: Final = "гор."
 # Наклон шкалы лист - эталон (промилле): больше первого - предупреждение, больше второго - этаж
 # не совмещается с причиной «масштаб листа». Оценка - по парам осей не ближе `SCALE_MIN_SPAN_MM`
 # (на коротком отрезке сдвиг кружка на выноске даёт большой наклон), пар не меньше трёх.
@@ -198,6 +209,17 @@ def _open_ring(ring: Sequence[Sequence[float]]) -> list[Point]:
     if len(points) > 1 and points[0] == points[-1]:
         points.pop()
     return points
+
+
+def _extra_slab_parts(slab: WallsSlab) -> list[list[list[float]]]:
+    """Части плиты кроме основной (`slab.shell` = `outline`), каждая упрощена до лимита точек."""
+    rings = slab.rings
+    main = next((i for i, ring in enumerate(rings) if ring == slab.shell), None)
+    return [
+        simplify_ring(ring)
+        for i, ring in enumerate(rings)
+        if i != main and len(_open_ring(ring)) >= 3
+    ]
 
 
 def simplify_ring(
@@ -457,13 +479,15 @@ def build_floor(
     zones = level_zones(extras.levels, document, levels.base_z_mm, levels.elevation_mm)
     rings = list(wall_rings)
     if extras.slab is not None:
-        rings.append(extras.slab.shell)
+        rings.extend(extras.slab.rings)
     rings.extend(zone.shell for zone in zones)
     box = bbox_of(rings)
     outline: list[list[float]]
+    outline_parts: list[list[list[float]]] = []
     source: str
     if extras.slab is not None and len(_open_ring(extras.slab.shell)) >= 3:
         outline, source = simplify_ring(extras.slab.shell), "slab"
+        outline_parts = _extra_slab_parts(extras.slab)
     else:
         # План кровли: стен в DXF почти нет, контур - по стенам и участкам уровней.
         fallback_box = bbox_of([*wall_rings, *(zone.shell for zone in zones)])
@@ -524,6 +548,7 @@ def build_floor(
         slab_thickness_known=thickness is not None,
         outline=outline,
         outline_source="slab" if source == "slab" else "bbox",
+        outline_parts=outline_parts,
         bbox=box,
         corps=corps,
         section=section,
@@ -935,6 +960,8 @@ class _OrientMatch:
     labels: list[str]
     residuals: list[float]
     common: int
+    # Единственная общая марка при двух и более осях у обоих этажей: нужна проверка перекрытием.
+    single: bool = False
 
 
 def _match_orient(
@@ -950,7 +977,10 @@ def _match_orient(
     if found is None:
         return f"{name} оси расходятся с эталоном: {', '.join(common)}"
     shift, labels = found
-    return _OrientMatch(shift, labels, [diffs[label] - shift for label in labels], len(common))
+    single = len(common) == 1 and len(reference) >= 2 and len(other) >= 2
+    return _OrientMatch(
+        shift, labels, [diffs[label] - shift for label in labels], len(common), single
+    )
 
 
 def _scale_ratio(
@@ -1049,6 +1079,7 @@ def _shifted(floor: CadBuilding3dFloorRead, dx: float, dy: float) -> CadBuilding
             "windows": windows,
             "levels": levels,
             "outline": [[x + dx, y + dy] for x, y in floor.outline],
+            "outline_parts": [[[x + dx, y + dy] for x, y in ring] for ring in floor.outline_parts],
             "bbox": None if box is None else [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy],
             "offset_mm": (round(ox + dx, 3), round(oy + dy, 3)),
         }
@@ -1275,6 +1306,11 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
         problems = [m for m in (along_x, along_y) if isinstance(m, str)]
         return _fallback(item, reference, "; ".join(problems))
     labels = [*along_x.labels, *along_y.labels]
+    # Подписи с направлением: одна и та же марка бывает и у вертикальной, и у горизонтальной оси.
+    shown = [
+        *(f"{label} ({LABEL_DIRECTION_VERTICAL})" for label in along_x.labels),
+        *(f"{label} ({LABEL_DIRECTION_HORIZONTAL})" for label in along_y.labels),
+    ]
     ratio = _scale_ratio(base, ours, frozenset(labels))
     permille = None if ratio is None else _permille(ratio)
     if ratio is not None and permille is not None and abs(permille) > SCALE_FAIL_PERMILLE:
@@ -1285,19 +1321,34 @@ def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead
         else _rotated(item.floor, quarters * QUARTER_DEG, along_x.shift, along_y.shift)
     )
     residuals = [*along_x.residuals, *along_y.residuals]
+    single = along_x.single or along_y.single
     if shifted.bbox is not None and reference.floor.bbox is not None:
         share = _overlap_share(shifted.bbox, reference.floor.bbox)
+        if single and share < SINGLE_AXIS_MIN_OVERLAP:
+            return _fallback(
+                item,
+                reference,
+                f"единственная общая ось по направлению ({', '.join(shown)}) не подтверждена: "
+                f"после совмещения габариты этажа и эталона перекрываются на {share:.0%}",
+            )
         if share < MIN_ALIGN_OVERLAP:
             return _fallback(
                 item,
                 reference,
-                f"после совмещения по осям {', '.join(labels)} этаж не перекрывает эталон "
+                f"после совмещения по осям {', '.join(shown)} этаж не перекрывает эталон "
                 f"({share:.0%})",
             )
+    elif single:
+        return _fallback(
+            item,
+            reference,
+            f"единственная общая ось по направлению ({', '.join(shown)}) не подтверждена: "
+            "нет габаритов этажа",
+        )
     return shifted.model_copy(
         update={
             "alignment": "axes",
-            "alignment_axes": labels,
+            "alignment_axes": shown,
             "alignment_message": None,
             "alignment_rms_mm": round(math.sqrt(sum(r * r for r in residuals) / len(residuals)), 1),
             "alignment_max_mm": round(max(abs(r) for r in residuals), 1),
@@ -2723,6 +2774,7 @@ def _rotated(
         return out
 
     outline = [list(point(x, y)) for x, y in floor.outline]
+    outline_parts = [[list(point(x, y)) for x, y in ring] for ring in floor.outline_parts]
     walls = (
         None
         if floor.walls is None
@@ -2753,6 +2805,7 @@ def _rotated(
     return floor.model_copy(
         update={
             "outline": outline,
+            "outline_parts": outline_parts,
             "walls": walls,
             "windows": windows,
             "levels": levels,
@@ -3298,6 +3351,7 @@ def _sheet_floor(
         + (0 if windows is None else windows.points)
         + sum(len(ring) for ring in cores)
         + len(floor.outline)
+        + sum(len(ring) for ring in floor.outline_parts)
         + sum(len(wall.shell) for wall in floor.walls or ())
         + sum(len(zone.shell) + sum(len(h) for h in zone.holes) for zone in floor.levels)
     )

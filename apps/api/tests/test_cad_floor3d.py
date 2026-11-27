@@ -747,3 +747,31 @@ def test_new_slab_fields_are_parsed_and_old_extras_keep_none() -> None:
     assert (parsed.slab.basis, parsed.slab.needs_review) == ("walls_only", True)
     old = WallsFloorExtras.model_validate(raw_extras())
     assert old.slab is not None and (old.slab.basis, old.slab.needs_review) == (None, None)
+
+
+SECOND_PART = [[8000.0, 0.0], [10000.0, 0.0], [10000.0, 3000.0], [8000.0, 3000.0]]
+
+
+def two_part_extras() -> dict[str, Any]:
+    extras = raw_extras()
+    extras["slab"]["parts"] = [
+        {"shell": extras["slab"]["shell"], "area_mm2": 24_000_000.0},
+        {"shell": SECOND_PART, "area_mm2": 6_000_000.0},
+    ]
+    extras["slab"]["area_mm2"] = 30_000_000.0
+    return extras
+
+
+def test_two_part_slab_is_returned_with_all_parts_and_total_area() -> None:
+    model = build(extras=two_part_extras())
+    assert model.slab is not None
+    assert model.slab.parts == [raw_extras()["slab"]["shell"], SECOND_PART]
+    assert model.slab.shell == raw_extras()["slab"]["shell"]
+    assert model.slab.area_m2 == 30.0
+    assert model.bbox is not None and model.bbox[2] == 10000.0
+
+
+def test_slab_without_parts_has_the_single_shell_as_part() -> None:
+    model = build()
+    assert model.slab is not None
+    assert model.slab.parts == [model.slab.shell]

@@ -66,15 +66,18 @@ interface IFloorMeshes {
   readonly edges: THREE.LineSegments;
 }
 
-const shapeOf = (spec: IBuildingFloorSpec): THREE.Shape =>
-  new THREE.Shape(spec.shell.map(([u, v]) => new THREE.Vector2(u, v)));
+/** Контур этажа и остальные части многочастной плиты: по фигуре на часть. */
+const shapesOf = (spec: IBuildingFloorSpec): THREE.Shape[] =>
+  [spec.shell, ...(spec.extraShells ?? [])].map(
+    (ring) => new THREE.Shape(ring.map(([u, v]) => new THREE.Vector2(u, v))),
+  );
 
 /** Призма из контура: поворот на -90° вокруг X даёт `(u, высота, -v)`. */
 const prism = (spec: IBuildingFloorSpec, yBottom: number, yTop: number): THREE.BufferGeometry | null => {
   const depth = yTop - yBottom;
   if (!(depth > 0)) return null;
   try {
-    const geometry = new THREE.ExtrudeGeometry(shapeOf(spec), { depth, bevelEnabled: false, steps: 1 });
+    const geometry = new THREE.ExtrudeGeometry(shapesOf(spec), { depth, bevelEnabled: false, steps: 1 });
     geometry.rotateX(-Math.PI / 2);
     geometry.translate(0, yBottom, 0);
     return geometry.getAttribute('position').count > 0 ? geometry : null;

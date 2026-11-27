@@ -1806,6 +1806,10 @@ export type CadBuilding3dFloorRead = {
      */
     outline: Array<Array<number>>;
     /**
+     * Outline Parts
+     */
+    outline_parts?: Array<Array<Array<number>>>;
+    /**
      * Outline Source
      */
     outline_source: 'slab' | 'bbox';
@@ -3833,6 +3837,10 @@ export type CadFloor3dSlabRead = {
      * Area M2
      */
     area_m2: number;
+    /**
+     * Parts
+     */
+    parts?: Array<Array<Array<number>>>;
     /**
      * Shell
      */

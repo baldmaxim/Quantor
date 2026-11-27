@@ -35,17 +35,36 @@ CadLintelMaterial = Literal["monolith", "masonry", "frame_partition"]
 # --------------------------------------------------------------------------- walls.json
 
 
+class WallsSlabPart(BaseModel):
+    """Часть многочастной плиты (cad_walls v1.27): контур и площадь без отверстий."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    shell: list[list[float]]
+    area_mm2: float = 0.0
+
+
 class WallsSlab(BaseModel):
-    """Наружный контур плиты после морфологического замыкания разрывов фасада."""
+    """Наружный контур плиты после морфологического замыкания разрывов фасада.
+
+    `shell` - самая большая часть (обратная совместимость), `area_mm2` - сумма частей. `parts`
+    (cad_walls v1.27) - все части плиты, у листа из двух корпусов их две; нет в старых файлах.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     shell: list[list[float]]
     area_mm2: float
+    parts: list[WallsSlabPart] = Field(default_factory=list)
     close_radius_mm: float | None = None
     # cad_walls v1.9: `zones` - контур по зонам помещений, `walls_only` - только по стенам.
     basis: str | None = None
     needs_review: bool | None = None
+
+    @property
+    def rings(self) -> list[list[list[float]]]:
+        """Контуры всех частей плиты; файл без `parts` - один контур `shell`."""
+        return [part.shell for part in self.parts] if self.parts else [self.shell]
 
 
 class WallsSlabHole(BaseModel):
@@ -147,6 +166,8 @@ class CadFloor3dSlabRead(BaseModel):
     """Плита этажа: верх — отметка этажа, низ — отметка минус толщина плиты."""
 
     shell: list[list[float]]
+    # Все части плиты (у листа из двух корпусов - две); `shell` - самая большая из них.
+    parts: list[list[list[float]]] = Field(default_factory=list)
     # Низ плиты; `None` — толщина плиты не определена.
     z_bottom_mm: int | None
     z_top_mm: int

@@ -50,6 +50,9 @@ const shiftSpec = (spec: IViewerFloorSpec, dx: number, dy: number, dv = 0, ghost
   ...spec,
   ...(ghost ? { ghost: true } : {}),
   shell: spec.shell.map(([u, v]) => [u + dx, v + dv] as const),
+  ...(spec.extraShells === undefined
+    ? {}
+    : { extraShells: spec.extraShells.map((ring) => ring.map(([u, v]) => [u + dx, v + dv] as const)) }),
   walls: spec.walls.map((wall) => ({
     ...wall,
     shell: wall.shell.map(([u, v]) => [u + dx, v + dv] as const),
@@ -163,7 +166,7 @@ export const groupLabels = (
     let maxV = -Infinity;
     for (const spec of specs) {
       if (top === null || spec.volumeTop > top.volumeTop) top = spec;
-      for (const [u, v] of spec.shell) {
+      for (const [u, v] of [spec.shell, ...(spec.extraShells ?? [])].flat()) {
         minU = Math.min(minU, u);
         maxU = Math.max(maxU, u);
         minV = Math.min(minV, v);

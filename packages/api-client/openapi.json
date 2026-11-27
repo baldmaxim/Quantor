@@ -3500,6 +3500,19 @@
             "title": "Outline",
             "type": "array"
           },
+          "outline_parts": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Outline Parts",
+            "type": "array"
+          },
           "outline_source": {
             "enum": [
               "slab",
@@ -7822,6 +7835,19 @@
           "area_m2": {
             "title": "Area M2",
             "type": "number"
+          },
+          "parts": {
+            "items": {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Parts",
+            "type": "array"
           },
           "shell": {
             "items": {

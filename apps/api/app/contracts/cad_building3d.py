@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.contracts.cad_constructions import CadConstructionKind
 
@@ -115,6 +115,9 @@ class CadBuilding3dFloorRead(BaseModel):
     # Контур плиты (не более 200 точек) или прямоугольник по стенам.
     outline: list[list[float]]
     outline_source: CadBuilding3dOutlineSource
+    # Остальные части многочастной плиты (лист из двух корпусов): каждая до 200 точек, в той же
+    # системе, что `outline` (основная - самая большая часть). Пусто - плита одним контуром.
+    outline_parts: list[list[list[float]]] = Field(default_factory=list)
     # [minx, miny, maxx, maxy] по плите и стенам листа.
     bbox: list[float] | None
     # Корпус и секция из заголовка плана; нет заголовка - `None`.

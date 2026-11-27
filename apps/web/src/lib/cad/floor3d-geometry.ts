@@ -34,6 +34,12 @@ export const isWindowPart = (category: PrismCategory | 'hole'): boolean =>
 /** Материал перемычки от движка; `null` - не определён или файл старый. */
 export type LintelMaterial = 'monolith' | 'masonry' | 'frame_partition';
 
+/** Часть многочастной плиты (лист из двух корпусов): контур и отверстия в плане (м, от центра). */
+export interface IPrismPart {
+  readonly shell: readonly Point2[];
+  readonly holes: readonly (readonly Point2[])[];
+}
+
 /** Призма: контур с отверстиями в плане (м, от центра) и высоты низа/верха (м, от центра по высоте). */
 export interface IPrismSpec {
   readonly id: string;
@@ -42,6 +48,8 @@ export interface IPrismSpec {
   readonly holes: readonly (readonly Point2[])[];
   readonly yBottom: number;
   readonly yTop: number;
+  /** Только у плиты из нескольких частей: остальные части (одна призма, один выбор); `shell` - основная. */
+  readonly extraParts?: readonly IPrismPart[];
   /** Только у перемычек: от него зависит цвет. */
   readonly material?: LintelMaterial | null;
   /** Только у перемычек и дверей: конструкция-владелец проёма (`construction_key` стены); `null` - не определена. */
@@ -143,6 +151,22 @@ const cleanRing = (ring: Ring): Point2[] | null => {
   return points.length >= 3 ? points : null;
 };
 
+/** Контуры совпадают по числу точек и координатам. */
+const sameRing = (a: Ring, b: Ring): boolean =>
+  a.length === b.length && a.every((point, index) => point[0] === b[index]?.[0] && point[1] === b[index]?.[1]);
+
+/** Точка внутри кольца (чётно-нечётное правило, луч вправо). */
+const insideRing = ([x, y]: Point2, polygon: readonly Point2[]): boolean => {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[index];
+    const b = polygon[previous];
+    if (!a || !b) continue;
+    if (a[1] > y !== b[1] > y && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+};
+
 const bboxOfRings = (rings: readonly Ring[]): readonly [number, number, number, number] | null => {
   let minX = Infinity;
   let minY = Infinity;
@@ -190,6 +214,7 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     category: PrismCategory;
     shell: Point2[];
     holes: Point2[][];
+    extraParts?: { shell: Point2[]; holes: Point2[][] }[];
     zBottom: number;
     zTop: number;
     material?: LintelMaterial | null;
@@ -207,11 +232,33 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     const shell = ring(model.slab.shell);
     if (model.slab.z_bottom_mm === null) slabWithoutBottom = true;
     else if (shell !== null) {
+      // Остальные части многочастной плиты: основная (`shell`) в `parts` пропускается.
+      let mainSkipped = false;
+      const extraParts: { shell: Point2[]; holes: Point2[][] }[] = [];
+      for (const part of model.slab.parts ?? []) {
+        if (!mainSkipped && sameRing(part, model.slab.shell)) {
+          mainSkipped = true;
+          continue;
+        }
+        const partShell = ring(part);
+        if (partShell !== null) extraParts.push({ shell: partShell, holes: [] });
+      }
+      const main = { shell, holes: [] as Point2[][] };
+      for (const { contour } of slabHoles) {
+        if (contour === null) continue;
+        // Одна часть - все отверстия в неё, как раньше; несколько - в ту, куда попадает отверстие.
+        const owner =
+          extraParts.length === 0
+            ? main
+            : [main, ...extraParts].find((part) => contour.some((point) => insideRing(point, part.shell)));
+        owner?.holes.push(contour);
+      }
       raw.push({
         id: 'slab',
         category: 'slab',
         shell,
-        holes: slabHoles.flatMap(({ contour }) => (contour === null ? [] : [contour])),
+        holes: main.holes,
+        ...(extraParts.length > 0 ? { extraParts } : {}),
         zBottom: model.slab.z_bottom_mm,
         zTop: model.slab.z_top_mm,
       });
@@ -304,7 +351,10 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
 
   // Центр: габарит в плане - bbox сервера (иначе по контурам), по высоте - середина диапазона призм.
   const bbox =
-    validBbox(model.bbox) ?? bboxOfRings(raw.map((item) => item.shell as unknown as Ring));
+    validBbox(model.bbox) ??
+    bboxOfRings(
+      raw.flatMap((item) => [item.shell, ...(item.extraParts ?? []).map((part) => part.shell)]) as unknown as Ring[],
+    );
   if (raw.length === 0 || bbox === null) {
     return {
       center: { x: 0, y: 0, z: 0 },
@@ -329,6 +379,14 @@ export const buildFloor3dPlan = (model: CadFloor3dRead): IFloor3dPlan => {
     category: item.category,
     shell: toLocal(item.shell, center),
     holes: item.holes.map((hole) => toLocal(hole, center)),
+    ...(item.extraParts === undefined
+      ? {}
+      : {
+          extraParts: item.extraParts.map((part) => ({
+            shell: toLocal(part.shell, center),
+            holes: part.holes.map((hole) => toLocal(hole, center)),
+          })),
+        }),
     yBottom: (item.zBottom - center.z) / MM_IN_M,
     yTop: (item.zTop - center.z) / MM_IN_M,
     ...(item.category === 'lintel' ? { material: item.material ?? null } : {}),

@@ -141,7 +141,12 @@ const prismGeometry = (spec: IPrismSpec): THREE.BufferGeometry | null => {
   const depth = spec.yTop - spec.yBottom;
   if (!(depth > 0)) return null;
   try {
-    const geometry = new THREE.ExtrudeGeometry(shapeOf(spec.shell, spec.holes), {
+    // Плита из нескольких частей - одна призма: фигура на часть, у каждой свои отверстия.
+    const shapes = [
+      shapeOf(spec.shell, spec.holes),
+      ...(spec.extraParts ?? []).map((part) => shapeOf(part.shell, part.holes)),
+    ];
+    const geometry = new THREE.ExtrudeGeometry(shapes, {
       depth,
       bevelEnabled: false,
       steps: 1,

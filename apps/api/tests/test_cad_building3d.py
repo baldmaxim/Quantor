@@ -334,7 +334,13 @@ def test_second_floor_is_aligned_by_common_axes_and_geometry_is_shifted() -> Non
     assert (ref_floor.alignment, ref_floor.offset_mm) == ("reference", (0.0, 0.0))
     assert floor.alignment == "axes" and floor.alignment_message is None
     assert floor.offset_mm == pytest.approx((-1234.0, 567.0))
-    assert floor.alignment_axes == ["3.1", "3.2", "3.3", "А", "Б"]
+    assert floor.alignment_axes == [
+        "3.1 (верт.)",
+        "3.2 (верт.)",
+        "3.3 (верт.)",
+        "А (гор.)",
+        "Б (гор.)",
+    ]
     assert floor.bbox == pytest.approx(ref_floor.bbox)
     assert [p for xy in floor.outline for p in xy] == pytest.approx(
         [p for xy in ref_floor.outline for p in xy]
@@ -415,7 +421,13 @@ def test_floor_drawn_turned_is_aligned_with_rotation_and_points_match_reference(
     ref_floor, floor = b3d.align_floors([reference, moved])
     assert floor.alignment == "axes" and floor.alignment_message is None
     assert floor.rotation_deg == pytest.approx(float(deg))
-    assert floor.alignment_axes == ["3.1", "3.2", "3.3", "А", "Б"]
+    assert floor.alignment_axes == [
+        "3.1 (верт.)",
+        "3.2 (верт.)",
+        "3.3 (верт.)",
+        "А (гор.)",
+        "Б (гор.)",
+    ]
     # Качество совмещения считается после поворота: оси сошлись точно.
     assert floor.alignment_rms_mm == 0.0 and floor.alignment_max_mm == 0.0
     assert floor.alignment_axes_common == 5
@@ -497,7 +509,13 @@ def test_reference_is_the_floor_sharing_most_axes_not_the_lowest_parking() -> No
     # Эталон - самый нижний из двух верхних (ничья по числу общих осей), подземный не совмещён.
     assert [f.alignment for f in floors] == ["none", "reference", "axes"]
     assert floors[0].alignment_message is not None
-    assert floors[2].alignment_axes == ["3.1", "3.2", "3.3", "А", "Б"]
+    assert floors[2].alignment_axes == [
+        "3.1 (верт.)",
+        "3.2 (верт.)",
+        "3.3 (верт.)",
+        "А (гор.)",
+        "Б (гор.)",
+    ]
 
 
 def test_reference_tie_by_shared_axes_keeps_the_lowest_floor() -> None:
@@ -552,7 +570,7 @@ def test_one_shifted_bubble_is_outvoted_by_agreeing_axes() -> None:
     other = built(elevation=BASE + 3000, order=1, axes=axes_block(skewed, REF_Y))
     _ref, floor = b3d.align_floors([reference, other])
     assert floor.alignment == "axes"
-    assert floor.alignment_axes == ["3.1", "3.2", "А", "Б"]
+    assert floor.alignment_axes == ["3.1 (верт.)", "3.2 (верт.)", "А (гор.)", "Б (гор.)"]
     assert floor.offset_mm == pytest.approx((-100.0, 0.0))
 
 
@@ -578,8 +596,55 @@ def test_single_common_labels_with_far_shift_do_not_overlap_reference() -> None:
     assert floor.alignment == "none" and floor.alignment_axes == []
     assert floor.alignment_message is not None
     assert "не перекрывает" in floor.alignment_message
-    assert "3.1, А" in floor.alignment_message
+    assert "3.1 (верт.), А (гор.)" in floor.alignment_message
     assert floor.bbox == pytest.approx([0.0, 0.0, 6000.0, 4000.0])
+
+
+SINGLE_REF_X = {"1": 1000.0, "2": 5000.0, "11": 9000.0}
+
+
+def test_single_common_vertical_mark_with_far_shift_falls_back_to_no_alignment() -> None:
+    reference = built(axes=axes_block(SINGLE_REF_X, REF_Y))
+    # Общая только «11» (на этаже ошибочно прочитана вместо «7»): сдвиг 3540 мм даёт перекрытие
+    # 41 % (габариты этажей одинаковы): больше MIN_ALIGN_OVERLAP, меньше порога единственной марки.
+    other = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block({"5": 1000.0, "11": 9000.0 - 3540.0}, REF_Y),
+    )
+    _ref, floor = b3d.align_floors([reference, other])
+    assert floor.alignment == "none" and floor.alignment_axes == []
+    assert floor.alignment_message is not None
+    assert "единственная общая ось" in floor.alignment_message
+    assert "11 (верт.)" in floor.alignment_message and "41%" in floor.alignment_message
+    assert floor.offset_mm == pytest.approx((0.0, 0.0), abs=1.0)
+    assert floor.bbox == pytest.approx([0.0, 0.0, 6000.0, 4000.0])
+
+
+def test_single_common_vertical_mark_is_accepted_when_footprints_match_after_shift() -> None:
+    reference = built(axes=axes_block(SINGLE_REF_X, REF_Y))
+    other = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block({"5": 1000.0, "11": 9000.0 - 600.0}, REF_Y),
+    )
+    _ref, floor = b3d.align_floors([reference, other])
+    assert floor.alignment == "axes" and floor.alignment_message is None
+    assert floor.alignment_axes == ["11 (верт.)", "А (гор.)", "Б (гор.)"]
+    assert floor.offset_mm == pytest.approx((600.0, 0.0))
+
+
+def test_two_agreeing_marks_are_accepted_regardless_of_single_axis_threshold() -> None:
+    reference = built(axes=axes_block(SINGLE_REF_X, REF_Y))
+    other = built(
+        elevation=BASE + 3000,
+        order=1,
+        axes=axes_block({"1": 1000.0 - 3540.0, "2": 5000.0 - 3540.0}, REF_Y),
+    )
+    _ref, floor = b3d.align_floors([reference, other])
+    assert floor.alignment == "axes"
+    assert floor.alignment_axes == ["1 (верт.)", "2 (верт.)", "А (гор.)", "Б (гор.)"]
+    assert floor.offset_mm == pytest.approx((3540.0, 0.0))
 
 
 def test_overlap_share_is_zero_for_degenerate_or_disjoint_boxes() -> None:
@@ -1497,3 +1562,42 @@ def test_only_oblique_axes_are_kept_with_alignment_message() -> None:
     axes = b3d.axes_in_mm({"axes": block}, FRAME)
     assert not axes.usable and len(axes.oblique) == 2
     assert axes.message == b3d.MESSAGE_AXES_OBLIQUE_ONLY
+
+
+# ------------------------------------------------------------------ многочастная плита
+
+SECOND_PART = [[8000.0, 0.0], [10000.0, 0.0], [10000.0, 3000.0], [8000.0, 3000.0]]
+
+
+def two_part_extras() -> dict[str, Any]:
+    extras = raw_extras()
+    extras["slab"]["parts"] = [
+        {"shell": extras["slab"]["shell"], "area_mm2": 24_000_000.0},
+        {"shell": SECOND_PART, "area_mm2": 6_000_000.0},
+    ]
+    extras["slab"]["area_mm2"] = 30_000_000.0
+    return extras
+
+
+def test_two_part_slab_gives_main_outline_and_extra_part_with_total_bbox() -> None:
+    floor = floor_of(raw_document(), two_part_extras())
+    assert floor.outline == [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]]
+    assert floor.outline_parts == [SECOND_PART]
+    assert floor.bbox == [0.0, 0.0, 10000.0, 4000.0]
+
+
+def test_slab_without_parts_has_no_extra_outline_parts() -> None:
+    floor = floor_of(raw_document(), raw_extras())
+    assert floor.outline_parts == []
+    assert floor.bbox == [0.0, 0.0, 6000.0, 4000.0]
+
+
+def test_shift_and_turn_move_extra_outline_parts_with_the_floor() -> None:
+    floor = floor_of(raw_document(), two_part_extras())
+    moved = b3d._shifted(floor, 1000.0, -500.0)
+    assert moved.outline_parts == [[[x + 1000.0, y - 500.0] for x, y in SECOND_PART]]
+    turned = b3d._rotated(floor, 90.0, 10.0, 20.0)
+    # R(90): (x, y) -> (-y, x), затем сдвиг (10, 20).
+    assert turned.outline_parts == [
+        [[10.0, 8020.0], [10.0, 10020.0], [-2990.0, 10020.0], [-2990.0, 8020.0]]
+    ]
