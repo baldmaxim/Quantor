@@ -103,7 +103,7 @@ def run(
     windows: list[tuple[WallsOpening, WallsOpeningExtras]],
     views: list[fw.FacadeViewInput],
     *,
-    slab: list[list[float]] | None = None,
+    slab_rings: list[list[list[float]]] | None = None,
     vertical: dict[str, float] | None = None,
     horizontal: dict[str, float] | None = None,
     level: fw.SheetLevel = LEVEL,
@@ -114,7 +114,7 @@ def run(
     return fw.match_sheet_windows(
         openings=[o for o, _ in windows],
         extras=[e for _, e in windows],
-        slab_shell=SLAB if slab is None else slab,
+        slab_rings=[SLAB] if slab_rings is None else slab_rings,
         vertical_axes=VERTICAL if vertical is None else vertical,
         horizontal_axes={} if horizontal is None else horizontal,
         corps=corps,
@@ -227,7 +227,7 @@ def test_only_the_outermost_plan_window_is_assigned_to_a_facade_window() -> None
     outer = plan_window("out", 3300.0, 3700.0, 0.0, 200.0)
     inner = plan_window("inn", 3300.0, 3700.0, 400.0, 600.0)
     window = fwindow(fx(3300.0), fx(3700.0), Z + 900, Z + 2400)
-    result = run([inner, outer], [view([window])], slab=slab)
+    result = run([inner, outer], [view([window])], slab_rings=[slab])
     assert set(result.heights) == {"out"}
     assert [i.code for i in result.issues] == [fw.CODE_HIDDEN]
 
@@ -330,7 +330,7 @@ def test_no_slab_means_no_matching_and_a_remark() -> None:
     result = fw.match_sheet_windows(
         openings=[SOUTH_WINDOW[0]],
         extras=[SOUTH_WINDOW[1]],
-        slab_shell=None,
+        slab_rings=None,
         vertical_axes=VERTICAL,
         horizontal_axes={},
         corps=None,
@@ -340,6 +340,42 @@ def test_no_slab_means_no_matching_and_a_remark() -> None:
     )
     assert result.heights == {}
     assert [i.code for i in result.issues] == [fw.CODE_NO_SLAB]
+
+
+def test_slab_without_valid_rings_means_no_matching_and_a_remark() -> None:
+    for rings in ([], [[[0.0, 0.0], [1.0, 1.0]]]):
+        result = run([SOUTH_WINDOW], [view([FACADE_OK])], slab_rings=rings)
+        assert result.heights == {}
+        assert [i.code for i in result.issues] == [fw.CODE_NO_SLAB]
+
+
+# Вторая часть плиты (лист из двух корпусов): правее первой, с зазором 1000 мм.
+SECOND_PART = [[7000.0, 0.0], [13000.0, 0.0], [13000.0, 4000.0], [7000.0, 4000.0]]
+
+
+def test_window_on_the_second_slab_part_is_matched_only_with_all_parts() -> None:
+    window = plan_window("w2", 9000.0, 10000.0)
+    facade = fwindow(fx(9000.0), fx(10000.0), Z + 900, Z + 2400)
+    only_first = run([window], [view([facade])], slab_rings=[SLAB])
+    assert only_first.heights == {}
+    assert [i.code for i in only_first.issues] == [fw.CODE_NOT_OUTER]
+    both = run([window], [view([facade])], slab_rings=[SLAB, SECOND_PART])
+    assert (both.heights["w2"].sill_mm, both.heights["w2"].head_mm) == (900, 2400)
+    assert both.issues == ()
+    # Окно первой части по-прежнему сопоставляется при двух частях.
+    assert "w1" in run([SOUTH_WINDOW], [view([FACADE_OK])], slab_rings=[SECOND_PART, SLAB]).heights
+
+
+def test_outward_side_takes_the_nearest_slab_part_across_a_narrow_gap() -> None:
+    # Зазор между частями 300 мм < пробы 600 мм: по объединению обе пробы внутри плиты.
+    near = [[6300.0, 0.0], [12000.0, 0.0], [12000.0, 4000.0], [6300.0, 4000.0]]
+    east = plan_window("e1", 5800.0, 6000.0, 1000.0, 2000.0, direction=(0.0, 1.0))
+    planned = fw._plan_window(east[0], east[1], [SLAB, near])
+    assert planned is not None and planned.outward == (1.0, 0.0)
+    # Окно на стене второй части, обращённой к первой, смотрит на запад.
+    west = plan_window("v1", 6300.0, 6500.0, 1000.0, 2000.0, direction=(0.0, 1.0))
+    planned_west = fw._plan_window(west[0], west[1], [SLAB, near])
+    assert planned_west is not None and planned_west.outward == (-1.0, 0.0)
 
 
 def test_window_with_own_height_or_no_views_gives_an_empty_result() -> None:
@@ -386,7 +422,7 @@ def test_loggia_glazing_with_its_own_height_hides_the_wall_window_behind_it() ->
     glazing = glazing.model_copy(update={"opening_height_mm": 2700})
     inner = plan_window("inn", 3300.0, 3700.0, 400.0, 600.0)
     window = fwindow(fx(3300.0), fx(3700.0), Z + 900, Z + 2400)
-    result = run([(glazing, glazing_extra), inner], [view([window])], slab=NOOK_SLAB)
+    result = run([(glazing, glazing_extra), inner], [view([window])], slab_rings=[NOOK_SLAB])
     # высоту остекления окно стены не получает; остекление свою высоту не меняет
     assert result.heights == {}
     assert [i.code for i in result.issues] == [fw.CODE_HIDDEN]

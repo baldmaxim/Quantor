@@ -504,6 +504,10 @@ export const highlightListOf = (
   return single === null ? [] : [single];
 };
 
+/** Призма плиты 3D - вся плита листа; в выборе - её основная часть `slab` или любая `slab-N`. */
+const isSlabSelected = (ids: ReadonlySet<string>): boolean =>
+  ids.has('slab') || [...ids].some((id) => id.startsWith('slab-'));
+
 /**
  * Оверлеи общего выбора: все призмы стен, перегородок и плиты, чей id входит в `ids` (группа из
  * панели - вся группа), и перемычки и двери этих стен (`hostId` в `ids`). Сами перемычки и двери
@@ -520,7 +524,9 @@ export const highlightsOf = (
           (item) =>
             item.category === 'lintel' || item.category === 'door' || isWindowPart(item.category)
               ? item.hostId != null && ids.has(item.hostId)
-              : ids.has(item.id) && (item.category === 'slab' || isWallCategory(item.category)),
+              : item.category === 'slab'
+                ? isSlabSelected(ids)
+                : ids.has(item.id) && isWallCategory(item.category),
         )
         .map((spec) => ({ kind: 'prism' as const, spec }));
 

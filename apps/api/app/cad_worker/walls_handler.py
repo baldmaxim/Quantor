@@ -644,5 +644,5 @@ async def execute_cad_walls(
     )
     done = await jobs_service.succeed(session, job=job, payload={"cad_result": result})
     # Автоход петли ИИ пилота: правщик по готовым конструкциям вида (в той же транзакции).
-    await ai_loop.after_walls(session, done, settings)
+    await ai_loop.after_walls(session, done, settings, storage)
     return done

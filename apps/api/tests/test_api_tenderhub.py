@@ -121,6 +121,50 @@ class TestResponseParsing:
         assert error.value.code is ErrorCode.TENDERHUB_UNAVAILABLE
 
 
+class TestGetTenderPathSafety:
+    """id тендера попадает в путь запроса: подозрительный id не доходит до сети."""
+
+    @pytest.mark.parametrize(
+        "tender_id",
+        ["../x", "a/b", "x?y", "x#y", "..", ".", "a b", "a%2Fb", "x\\y"],
+    )
+    async def test_unsafe_id_is_refused_without_request(self, tender_id: str) -> None:
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(200, json={"data": TENDER})
+
+        async with make_client(handler) as client:
+            with pytest.raises(DomainError) as error:
+                await client.get_tender(tender_id)
+
+        assert error.value.code is ErrorCode.TENDERHUB_TENDER_NOT_FOUND
+        assert requests == []
+
+    async def test_safe_id_is_requested(self) -> None:
+        paths: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            paths.append(request.url.path)
+            return httpx.Response(200, json={"data": TENDER})
+
+        async with make_client(handler) as client:
+            tender = await client.get_tender(TENDER["id"])
+
+        assert tender.id == TENDER["id"]
+        assert len(paths) == 1 and TENDER["id"] in paths[0]
+
+    async def test_response_with_other_id_is_refused(self) -> None:
+        other = {**TENDER, "id": "22222222-2222-4222-8222-222222222222"}
+
+        async with make_client(answer(200, {"data": other})) as client:
+            with pytest.raises(DomainError) as error:
+                await client.get_tender(TENDER["id"])
+
+        assert error.value.code is ErrorCode.TENDERHUB_TENDER_NOT_FOUND
+
+
 class TestUpstreamFailures:
     """Отказ внешней системы должен объяснять, что именно чинить."""
 

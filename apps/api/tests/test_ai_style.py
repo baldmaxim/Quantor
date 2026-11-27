@@ -91,7 +91,13 @@ def test_report_schema_names_the_class_field_and_bounds_the_answer() -> None:
 
 
 def test_style_is_a_prompt_and_job_role_but_not_a_manual_review_start() -> None:
-    assert get_args(AiPromptRole) == ("corrector", "verifier", "vor_mapper", "style")
+    assert get_args(AiPromptRole) == (
+        "corrector",
+        "verifier",
+        "vor_mapper",
+        "style",
+        "coordination",
+    )
     with pytest.raises(ValidationError):
         AiReviewStart.model_validate({"role": "style"})
 

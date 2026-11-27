@@ -8,13 +8,10 @@ import { KIND_LABELS, constructionTitle } from '@/lib/cad/construction-labels';
 import { formatMeters } from '@/lib/cad/floor3d-geometry';
 import { heightSourceText } from '@/lib/cad/floor3d-heights';
 import type { IFloor3dPick } from '@/lib/cad/floor3d-scene';
-import { findConstruction, wallQuantities } from '@/lib/cad/floor3d-volume';
+import { findConstruction, slabTotals, wallQuantities } from '@/lib/cad/floor3d-volume';
 import { formatNumber } from '@/lib/cad/view-format';
 
 import { CadFloor3dPopoverFrame } from './CadFloor3dPopoverFrame';
-
-/** Идентификатор плиты листа среди конструкций и призм 3D-плана. */
-const SLAB_ID = 'slab';
 
 const HOLE_STATE_TEXT = {
   candidate: 'кандидат, решения нет',
@@ -129,8 +126,8 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
       </>
     );
   } else if (pick.kind === 'prism' && pick.category === 'slab') {
-    // Величины плиты - из конструкций листа (id `slab`); вид ничего не считает.
-    const slab = findConstruction(constructions, SLAB_ID);
+    // Величины плиты - из конструкций листа: сумма частей (`slab`, `slab-N`); вид ничего не считает.
+    const slab = slabTotals(constructions);
     title = KIND_LABELS.floor_slab;
     const orUndefined = (value: number | null | undefined, digits: number, unit: string): string =>
       value === null || value === undefined ? 'не определена' : formatNumber(value, digits, unit);
@@ -139,12 +136,12 @@ export const CadFloor3dPopover: FC<ICadFloor3dPopoverProps> = ({
         <p className="text-xs text-muted">Плита не посчитана</p>
       ) : (
         <>
-          <Row label="Площадь (нетто)" value={orUndefined(slab.computed.area_m2, 2, 'м²')} />
-          <Row label="Толщина" value={orUndefined(slab.computed.thickness_mm, 0, 'мм')} />
-          {slab.computed.volume_m3 === null || slab.computed.volume_m3 === undefined ? (
+          <Row label="Площадь (нетто)" value={orUndefined(slab.areaM2, 2, 'м²')} />
+          <Row label="Толщина" value={orUndefined(slab.thicknessMm, 0, 'мм')} />
+          {slab.volumeM3 === null || slab.volumeM3 === undefined ? (
             <p className="text-xs text-muted">Объём не определён</p>
           ) : (
-            <Row label="Объём" value={formatNumber(slab.computed.volume_m3, 3, 'м³')} />
+            <Row label="Объём" value={formatNumber(slab.volumeM3, 3, 'м³')} />
           )}
         </>
       );

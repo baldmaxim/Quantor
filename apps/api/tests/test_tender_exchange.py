@@ -1226,3 +1226,45 @@ def test_object_base_thickness_of_monolith_without_nominal_uses_measured_section
         "pil": None,
         "wall": 400,
     }
+
+
+def test_object_base_slab_parts_only_when_there_are_several() -> None:
+    """`slab.parts` - части плиты листа из двух корпусов; одна часть и старый файл - ключа нет."""
+    from app.contracts.cad_constructions import WallsDocument
+    from app.contracts.cad_floor3d import WallsFloorExtras
+    from app.contracts.tender_exchange import ObjectBaseSlab
+    from app.services import tender_base
+    from tests.test_cad_constructions_calc import document
+    from tests.test_cad_slab import PART_B, SHELL, two_part_extras
+
+    doc: WallsDocument = document([])
+    built = tender_base.build_constructions(doc, two_part_extras(), {})
+    assert built.slab is not None
+    main = [[round(x), round(y)] for x, y in SHELL]
+    second = [[round(x), round(y)] for x, y in PART_B]
+    assert built.slab.shell == main and built.slab.parts == [main, second]
+    dumped = built.model_dump(by_alias=True)["slab"]
+    assert dumped["parts"] == [main, second]
+
+    single = WallsFloorExtras.model_validate(
+        {"slab": {"shell": SHELL, "area_mm2": 24_000_000.0, "parts": [{"shell": SHELL}]}}
+    )
+    old = WallsFloorExtras.model_validate({"slab": {"shell": SHELL, "area_mm2": 24_000_000.0}})
+    for extras in (single, old):
+        built_single = tender_base.build_constructions(doc, extras, {})
+        slab = built_single.slab
+        assert slab is not None and slab.shell == main and slab.parts is None
+        assert b'"parts"' not in tender_base._dump(built_single)
+    # Пустой список и одна часть сериализуются так же, как «частей нет»: ключа нет совсем.
+    for empty in (None, [], [main]):
+        assert "parts" not in ObjectBaseSlab(shell=main, parts=empty).model_dump()
+
+
+def test_published_json_schemas_match_contracts() -> None:
+    """Схемы в docs/tender-exchange/schemas порождены из контрактов (app.tender_schemas_export)."""
+    from app.tender_schemas_export import OUTPUT_DIR, schema_files
+
+    expected = schema_files()
+    assert sorted(path.name for path in OUTPUT_DIR.glob("*.schema.json")) == sorted(expected)
+    for name, content in expected.items():
+        assert (OUTPUT_DIR / name).read_text(encoding="utf-8") == content, name

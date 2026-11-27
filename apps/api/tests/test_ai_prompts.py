@@ -121,7 +121,7 @@ class _Session:
         self._objects = objects
 
     async def get(self, model: Any, key: Any) -> Any:
-        return self._objects[model.__name__]
+        return self._objects.get(model.__name__)
 
     async def scalar(self, *args: Any, **kwargs: Any) -> Any:
         return await self._real.scalar(*args, **kwargs)
@@ -199,9 +199,11 @@ async def test_prepare_writes_active_prompt_and_version(
         cast(AsyncSession, _Session(db_session, objects)), job, fake_storage, tmp_path
     )
 
-    assert (tmp_path / "prompt.txt").read_bytes() == text.encode()
+    # К тексту версии дописан блок «Состав пакета»; сама версия в БД не меняется.
+    sent = (text + ai_review.PACK_PROMPT_BLOCK).encode()
+    assert (tmp_path / "prompt.txt").read_bytes() == sent
     assert hashlib.sha256((tmp_path / "prompt.txt").read_bytes()).hexdigest() == (
-        hashlib.sha256(text.encode()).hexdigest()
+        hashlib.sha256(sent).hexdigest()
     )
     assert manifest["prompt_version_id"] == str(active_id)
     assert manifest["prompt_version"] == 2
@@ -339,6 +341,54 @@ async def test_stats_by_version_with_remark_fates(
     assert empty["verdicts"] == {} and empty["remarks_open"] == 0
 
 
+async def test_stats_count_style_and_coordination_cost_but_not_skipped_or_reused_runs(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    """Стоимость стиля и координации входит в статистику; без вызова модели - не прогон."""
+    style = await _seed(db_session, "style", 1, "active")
+    coord = await _seed(db_session, "coordination", 1, "active")
+    async with build_api(_admin(), settings=clean_settings(environment="test")) as probe:
+        plan = await _plan(db_session, fake_storage, probe, workspace_id, 1)
+    walls = plan.walls[0]
+
+    def add(prompt_id: uuid.UUID, role: str, result_key: str, result: dict[str, Any]) -> None:
+        add_job(
+            db_session,
+            workspace_id=walls.workspace_id,
+            project_id=walls.project_id,
+            status=JobStatus.SUCCEEDED,
+            job_type=JobType.CAD_AI_REVIEW,
+            payload={"role": role, "prompt_version_id": str(prompt_id), result_key: result},
+        )
+
+    add(style, "style", "ai_style", {"usage": {"cost_usd": 0.4, "duration_ms": 2000}})
+    add(coord, "coordination", "ai_coordination", {"status": "ok", "usage": {"cost_usd": 0.2}})
+    add(
+        coord, "coordination", "ai_coordination", {"status": "rejected", "usage": {"cost_usd": 0.1}}
+    )
+    add(coord, "coordination", "ai_coordination", {"status": "skipped", "reason": "эталона нет"})
+    add(
+        coord,
+        "coordination",
+        "ai_coordination",
+        {"status": "ok", "usage": {"cost_usd": None}, "reused_from": str(uuid.uuid4())},
+    )
+    await db_session.commit()
+
+    async with build_api(_admin()) as client:
+        response = await client.get(f"{URL}/stats")
+
+    rows = {row["role"]: row for row in response.json()["rows"]}
+    assert rows["style"]["runs_total"] == 1
+    assert rows["style"]["cost_sum_usd"] == pytest.approx(0.4)
+    assert rows["style"]["duration_avg_ms"] == pytest.approx(2000)
+    assert rows["coordination"]["runs_total"] == 2
+    assert rows["coordination"]["cost_sum_usd"] == pytest.approx(0.3)
+
+
 async def test_migration_seeds_old_cli_prompts_as_active_version_one(
     migrated_engine: AsyncEngine,
 ) -> None:
@@ -353,6 +403,7 @@ async def test_migration_seeds_old_cli_prompts_as_active_version_one(
             )
         ).all()
     assert [(row.role, row.version, row.status, row.created_by) for row in rows] == [
+        ("coordination", 1, "active", None),
         ("corrector", 1, "active", None),
         ("style", 1, "active", None),
         ("verifier", 1, "active", None),
@@ -369,6 +420,10 @@ async def test_migration_seeds_old_cli_prompts_as_active_version_one(
     style = next(row.text for row in rows if row.role == "style")
     assert style.startswith("Ты определяешь, как проектировщик оформил материалы стен на плане")
     assert "hatch_signatures.json" in style and style.endswith("Верни один JSON по схеме.\n")
+    coordination = next(row.text for row in rows if row.role == "coordination")
+    assert coordination.startswith("Ты сопоставляешь оси двух планов одного здания")
+    assert "axes_target.json" in coordination and "plan_reference.png" in coordination
+    assert "schema.json" in coordination and "offset" not in coordination.lower()
 
 
 __all__ = ["migrated_engine"]

@@ -6,6 +6,7 @@ import importlib.util
 import json
 import shlex
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 from typing import Any
@@ -20,13 +21,22 @@ timeout = int(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="quantor-ai-") as directory:
     root = Path(directory)
     names = {"manifest.json", "walls.json", "project_context.json", "source.pdf", "plan.png",
-             "overlay.png", "slab_overlay.png", "prompt.txt", "schema.json", "render.json"}
+             "overlay.png", "slab_overlay.png", "prompt.txt", "schema.json", "render.json",
+             "walls_summary.json", "tiles.json"}
     optional = {"prev_round_diff.json"}
+    tile_pattern = re.compile("tiles/r[0-9]+c[0-9]+_(pdf|overlay)[.]png")
+    tile_count = 0
     with tarfile.open(fileobj=sys.stdin.buffer, mode="r|") as archive:
         for member in archive:
-            allowed = member.name in names or member.name in optional
+            is_tile = tile_pattern.fullmatch(member.name) is not None
+            allowed = member.name in names or member.name in optional or is_tile
             if not allowed or not member.isfile() or member.size > 32 * 1024 * 1024:
                 sys.exit("Invalid review package")
+            if is_tile:
+                tile_count += 1
+                if tile_count > 40:
+                    sys.exit("Invalid review package")
+                (root / "tiles").mkdir(exist_ok=True)
             names.discard(member.name)
             optional.discard(member.name)
             with (root / member.name).open("xb") as target:
@@ -59,22 +69,36 @@ with tempfile.TemporaryDirectory(prefix="quantor-ai-") as directory:
     schema = (root / "schema.json").read_text(encoding="utf-8")
     try:
         with (root / "prompt.txt").open("rb") as prompt, (root / "answer.json").open("wb") as out:
-            subprocess.run(
+            completed = subprocess.run(
                 [shutil.which("claude", path=env["PATH"]) or "claude",
                  "-p", "--model", model, "--setting-sources", "", "--strict-mcp-config",
                  "--disable-slash-commands", "--no-session-persistence",
                  "--output-format", "json", "--json-schema", schema,
                  "--allowed-tools", "Read", "--permission-mode", "dontAsk"],
                 cwd=root, env=env, stdin=prompt, stdout=out,
-                stderr=subprocess.DEVNULL, check=True, timeout=timeout,
+                stderr=subprocess.DEVNULL, check=False, timeout=timeout,
             )
     except subprocess.TimeoutExpired:
         sys.exit(124)
-    with (root / "answer.json").open("rb") as answer:
-        data = json.loads(answer.read(4 * 1024 * 1024))
+    try:
+        with (root / "answer.json").open("rb") as answer:
+            data = json.loads(answer.read(4 * 1024 * 1024) or b"{}")
+    except ValueError:
+        data = {}
     if isinstance(data, list):
         data = next((item for item in reversed(data) if item.get("type") == "result"), {})
-    if data.get("is_error") or not isinstance(data.get("structured_output"), dict):
+    if not isinstance(data, dict):
+        data = {}
+    if (completed.returncode or data.get("is_error")
+            or not isinstance(data.get("structured_output"), dict)):
+        # Причина отказа - одной строкой JSON в stderr; полный ответ и ключи не печатаем.
+        sys.stderr.write(json.dumps({
+            "subtype": data.get("subtype"),
+            "is_error": data.get("is_error"),
+            "num_turns": data.get("num_turns"),
+            "duration_ms": data.get("duration_ms"),
+            "result": str(data.get("result") or f"claude exit code {completed.returncode}")[:500],
+        }, ensure_ascii=False) + "\\n")
         sys.exit(3)
     usage = data.get("usage") or {}
     print(json.dumps({
@@ -89,6 +113,17 @@ with tempfile.TemporaryDirectory(prefix="quantor-ai-") as directory:
         "model": model,
     }, ensure_ascii=False))
 """
+
+
+def _load_sibling(name: str) -> Any:
+    """Модуль рядом с этим файлом: под `python -I` пакета `app` нет, грузим по пути."""
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(name + ".py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"{name}.py не найден рядом с ai_review_cli.py")
+    module: Any = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def render(root: Path) -> None:
@@ -121,36 +156,19 @@ def render(root: Path) -> None:
     ]
     (root / "render.json").write_text(json.dumps({"clip": extent, "zoom": zoom}), encoding="utf-8")
 
+    pack = _load_sibling("ai_review_pack")
     base_rgb = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
     image = base_rgb.copy()
-    draw = ImageDraw.Draw(image)
     ox, oy, mm_per_pt = manifest["frame"]
-
-    def draw_ring(ring: list[list[float]], color: str) -> None:
-        points = [
-            ((ox + x / mm_per_pt) * zoom - pix.x, (oy - y / mm_per_pt) * zoom - pix.y)
-            for x, y in ring
-        ]
-        if len(points) >= 3:
-            draw.line([*points, points[0]], fill=color, width=2)
-
-    for group, color in (("constructions", "#e11d48"), ("frame_partitions", "#0284c7")):
-        for row in walls.get(group, []):
-            polygon = row["polygon"]
-            for ring in [polygon["shell"], *polygon["holes"]]:
-                draw_ring(ring, color)
-    for opening in walls.get("openings", []):
-        if opening.get("lintel"):
-            draw_ring(opening["lintel"], "#15803d")
+    pack.draw_overlay(
+        ImageDraw.Draw(image),
+        walls,
+        pack.ring_converter((ox, oy, mm_per_pt), zoom, pix.x, pix.y),
+        2,
+    )
     image.save(root / "overlay.png")
 
-    spec = importlib.util.spec_from_file_location(
-        "view_render_cli", Path(__file__).with_name("view_render_cli.py")
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("view_render_cli.py не найден рядом с ai_review_cli.py")
-    render_mod: Any = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(render_mod)
+    render_mod = _load_sibling("view_render_cli")
     render_mod.render_slab_overlay(
         base_rgb=base_rgb,
         walls=walls,
@@ -159,6 +177,17 @@ def render(root: Path) -> None:
         pix_x=pix.x,
         pix_y=pix.y,
         out_path=root / "slab_overlay.png",
+    )
+    pack.write_pack(
+        root,
+        walls,
+        frame=(ox, oy, mm_per_pt),
+        plan_zoom=zoom,
+        plan_pix_x=pix.x,
+        plan_pix_y=pix.y,
+        plan_width=pix.width,
+        plan_height=pix.height,
+        view_zone=manifest.get("view_zone"),
     )
 
 
@@ -181,6 +210,9 @@ def review(root: Path, ssh_config: str, timeout: int) -> None:
             "prompt.txt",
             "schema.json",
             "render.json",
+            "walls_summary.json",
+            "tiles.json",
+            *sorted(f"tiles/{item.name}" for item in (root / "tiles").iterdir()),
         ):
             path = root / name
             if path.stat().st_size > 32 * 1024 * 1024:

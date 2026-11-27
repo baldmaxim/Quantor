@@ -146,7 +146,10 @@ async def start_cad_ai_review(
     dependencies=[require(Permission.JOBS_READ), require_feature("cad.export")],
 )
 async def read_cad_outline_source(
-    job_id: uuid.UUID, role: SourceRole, session: SessionDep, workspace: WorkspaceDep,
+    job_id: uuid.UUID,
+    role: SourceRole,
+    session: SessionDep,
+    workspace: WorkspaceDep,
     storage: StorageDep,
 ) -> StreamingResponse:
     job = await jobs_service.get_job(session, workspace_id=workspace.tenant, job_id=job_id)

@@ -692,3 +692,21 @@ def test_columns_649_9_and_650_make_one_totals_group() -> None:
     (group,) = result.totals
     assert (group.kind, group.thickness_mm, group.count) == ("monolith_column", 650.0, 2)
     assert group.volume_m3 == pytest.approx((SECTION_AREA_MM2 + 422_500.0) * 2800 / 1e9, rel=1e-3)
+
+
+def test_every_slab_part_is_a_construction_with_its_own_area() -> None:
+    def part(slab_id: str, area_mm2: float) -> calc.SlabInput:
+        ring = [[0.0, 0.0], [1000.0, 0.0], [1000.0, 1000.0], [0.0, 1000.0]]
+        return calc.SlabInput(id=slab_id, shell=ring, area_mm2=area_mm2)
+
+    doc = document([construction()])
+    doc.heights.slab_thickness_mm = 200
+    doc.heights.slab_status = "assumption"
+    slabs = [part(calc.SLAB_ID, 10_000_000.0), part(f"{calc.SLAB_ID}-2", 5_000_000.0)]
+    result = calc.compute_sheet(doc, {}, NO_LEVELS, None, slabs)
+    assert [c.id for c in result.constructions] == ["c1", "slab", "slab-2"]
+    assert result.summary.total_count == 3
+    (group,) = [t for t in result.totals if t.kind == "floor_slab"]
+    assert (group.count, group.area_m2) == (2, 15.0)
+    assert group.volume_m3 == pytest.approx(3.0)
+    assert calc.compute_sheet(doc, {}, NO_LEVELS).summary.total_count == 1

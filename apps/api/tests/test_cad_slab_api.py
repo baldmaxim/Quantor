@@ -171,3 +171,133 @@ async def test_vor_coverage_includes_the_slab_group(
         assert response.status_code == 200, response.text
         keys = [g["group_key"] for g in response.json()["groups"]]
         assert "floor_slab|200|" in keys
+
+
+@pytest.fixture
+def floor_tools_two_part_slab(floor_tools: Path) -> Path:
+    """walls.json с плитой из двух частей (cad_walls v1.27): 24 м2 и 9 м2, отверстия - в первой."""
+    stub = floor_tools / "run_walls.py"
+    second = "[[8000.0, 0.0], [11000.0, 0.0], [11000.0, 3000.0], [8000.0, 3000.0]]"
+    stub.write_text(
+        FLOOR_STUB.replace(
+            SLAB_FIELDS,
+            '"area_mm2": 33000000.0, "parts": ['
+            '{"shell": [[0.0, 0.0], [6000.0, 0.0], [6000.0, 4000.0], [0.0, 4000.0]],'
+            ' "area_mm2": 24000000.0},'
+            f' {{"shell": {second}, "area_mm2": 9000000.0}}]}}',
+        ),
+        encoding="utf-8",
+    )
+    return floor_tools
+
+
+async def test_two_part_slab_gives_a_construction_per_part(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools_two_part_slab: Path,
+    tmp_path: Path,
+) -> None:
+    settings = walls_settings(floor_tools_two_part_slab, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, job_id = await _setup(
+            api, db_session, fake_storage, floor_tools_two_part_slab, tmp_path
+        )
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert [c["id"] for c in body["constructions"]][-2:] == ["slab", "slab-2"]
+        main, second = _construction(body, "slab"), _construction(body, "slab-2")
+        assert main["computed"]["area_m2"] == 21.0 and len(main["polygon"]["holes"]) == 2
+        assert second["computed"]["area_m2"] == 9.0 and second["polygon"]["holes"] == []
+        assert body["summary"]["total_count"] == 6
+        group = next(t for t in body["totals"] if t["kind"] == "floor_slab")
+        assert group["count"] == 2 and group["area_m2"] == 30.0
+
+        # Адрес второй части известен: параметры сохраняются, итог пересчитывается.
+        put = await api.put(
+            _url(project_id, job_id, "constructions/slab-2/props"),
+            json={"props": {"thickness_override_mm": 300}},
+        )
+        assert put.status_code == 200, put.text
+        assert put.json()["computed"]["volume_m3"] == pytest.approx(9.0 * 0.3)
+        bulk = await api.put(
+            _url(project_id, job_id, "constructions/props:bulk"),
+            json={"keys": ["slab", "slab-2"], "props_patch": {}, "accepted": True},
+        )
+        assert bulk.status_code == 200, bulk.text
+        assert bulk.json()["changed"] == 2
+        assert (
+            await api.put(
+                _url(project_id, job_id, "constructions/slab-3/props"), json={"props": {}}
+            )
+        ).status_code == 404
+
+
+async def test_bulk_on_extra_slab_part_keeps_params_inherited_from_the_main_slab(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools_two_part_slab: Path,
+    tmp_path: Path,
+) -> None:
+    """У `slab-2` нет своей записи: пакетное «принять» не должно обнулять унаследованное."""
+    settings = walls_settings(floor_tools_two_part_slab, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, job_id = await _setup(
+            api, db_session, fake_storage, floor_tools_two_part_slab, tmp_path
+        )
+        put = await api.put(
+            _url(project_id, job_id, "constructions/slab/props"),
+            json={"props": {"thickness_override_mm": 250, "material": "monolith_concrete"}},
+        )
+        assert put.status_code == 200, put.text
+        bulk = await api.put(
+            _url(project_id, job_id, "constructions/props:bulk"),
+            json={"keys": ["slab-2"], "props_patch": {}, "accepted": True},
+        )
+        assert bulk.status_code == 200, bulk.text
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        second = _construction(body, "slab-2")
+        assert second["props"]["thickness_override_mm"] == 250
+        assert second["material"]["value"] == "monolith_concrete"
+        assert second["accepted"] is True
+        assert second["computed"]["volume_m3"] == pytest.approx(9.0 * 0.25)
+
+
+async def test_acceptance_of_the_main_slab_is_not_inherited_by_the_extra_part(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    floor_tools_two_part_slab: Path,
+    tmp_path: Path,
+) -> None:
+    """Параметры `slab-2` берутся у `slab`, принятие - нет: каждую часть принимает человек."""
+    settings = walls_settings(floor_tools_two_part_slab, tmp_path)
+    async with build_api(make_context(), settings=settings) as api:
+        project_id, job_id = await _setup(
+            api, db_session, fake_storage, floor_tools_two_part_slab, tmp_path
+        )
+        accept = await api.put(
+            _url(project_id, job_id, "constructions/slab/props"),
+            json={"props": {"thickness_override_mm": 250}, "accepted": True},
+        )
+        assert accept.status_code == 200, accept.text
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        main, second = _construction(body, "slab"), _construction(body, "slab-2")
+        assert main["accepted"] is True
+        assert second["accepted"] is False and second["props"]["thickness_override_mm"] == 250
+        # Правка параметров части без `accepted` принятие основной плиты не подхватывает.
+        edited = await api.put(
+            _url(project_id, job_id, "constructions/slab-2/props"),
+            json={"props": {"thickness_override_mm": 300}},
+        )
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["accepted"] is False
+        # Пакетная правка без `accepted` - тоже.
+        bulk = await api.put(
+            _url(project_id, job_id, "constructions/props:bulk"),
+            json={"keys": ["slab-2"], "props_patch": {"thickness_override_mm": 320}},
+        )
+        assert bulk.status_code == 200, bulk.text
+        body = (await api.get(_url(project_id, job_id, "constructions"))).json()
+        assert _construction(body, "slab-2")["accepted"] is False
+        assert _construction(body, "slab")["accepted"] is True

@@ -142,6 +142,32 @@
     "ObjectBaseSlab": {
       "additionalProperties": false,
       "properties": {
+        "parts": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "type": "array"
+                },
+                "maxItems": 100000,
+                "minItems": 3,
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Все части плиты, включая основную (`shell`); есть только когда частей больше одной (лист из двух корпусов), иначе поля нет. `shell` - самая большая часть.",
+          "title": "Parts"
+        },
         "shell": {
           "items": {
             "items": {

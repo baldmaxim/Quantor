@@ -9,15 +9,23 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
-from app.api.v1.deps import AuthDep, SessionDep, StorageDep, require, require_feature
+from app.api.v1.deps import (
+    AuthDep,
+    SessionDep,
+    SettingsDep,
+    StorageDep,
+    require,
+    require_feature,
+)
 from app.auth.permissions import Permission
 from app.auth.resolver import require_authenticated
+from app.contracts.cad_ai_coordination import AiCoordinationStart, AiCoordinationStarted
 from app.contracts.cad_building3d import CadBuilding3dRead
 from app.contracts.cad_project_context import CadProjectContextRead
 from app.errors import DomainError, ErrorCode, not_found
-from app.services import cad_building3d_assembly, cad_project_context
+from app.services import cad_axis_coordination_jobs, cad_building3d_assembly, cad_project_context
 from app.services import projects as projects_service
 
 router = APIRouter(tags=["cad-building3d"], dependencies=[require_feature("cad.export")])
@@ -47,6 +55,43 @@ async def read_cad_building3d(
     return await cad_building3d_assembly.build_building3d(
         session, storage, workspace_id=context.tenant, project_id=project_id, include_walls=walls
     )
+
+
+@router.post(
+    "/projects/{project_id}/cad/building3d/axis-coordination",
+    response_model=AiCoordinationStarted,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Запустить ИИ-координацию осей вида с эталоном «Здания» (пилот)",
+    dependencies=[require(Permission.DOCUMENT_UPLOAD)],
+)
+async def start_axis_coordination(
+    project_id: uuid.UUID,
+    body: AiCoordinationStart,
+    session: SessionDep,
+    context: AuthDep,
+    settings: SettingsDep,
+) -> AiCoordinationStarted:
+    project = await projects_service.get_project(
+        session, workspace_id=context.tenant, project_id=project_id
+    )
+    if project is None:
+        raise not_found("Проект")
+    job, target_id = await cad_axis_coordination_jobs.start_for_view(
+        session,
+        settings,
+        workspace_id=context.tenant,
+        project_id=project_id,
+        revision_id=body.revision_id,
+        page_index=body.page_index,
+        view=body.view,
+    )
+    result = AiCoordinationStarted(
+        job_id=job.id,
+        status=job.status.value,
+        target_walls_job_id=target_id,
+    )
+    await session.commit()
+    return result
 
 
 @router.get(

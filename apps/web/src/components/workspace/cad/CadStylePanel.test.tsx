@@ -146,7 +146,7 @@ describe('CadStylePanel', () => {
         })}
       />,
     );
-    expect(screen.getByText(/щёлкайте внутри заливок и по штриховке/)).toBeTruthy();
+    expect(screen.getByText(/Монолит — внутри заливки или по штриховке стены/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Принять' })).toBeNull();
   });
 
@@ -194,6 +194,58 @@ describe('CadStylePanel', () => {
     );
     const rejected = screen.getByRole('region', { name: 'Отклонённые щелчки' });
     expect(rejected.textContent).toContain('Монолит №1: в точке нет заливки');
+  });
+
+  it('монолит: подписи штриховки и число отрезков; шахты только контуром отдельным блоком', () => {
+    const base = previewBody();
+    render(
+      <CadStylePanel
+        {...props({
+          samples: [{ class: 'shaft', x: 0.1, y: 0.1, negative: false }],
+          preview: {
+            running: false,
+            result: result({
+              preview: previewBody({
+                classes: {
+                  ...base.classes,
+                  monolith: {
+                    ...base.classes.monolith,
+                    hatch_segments: 17,
+                    hatch_signatures: [
+                      { color: [0, 0, 0], pen: 0.25, angle_deg: 45, pitch_pt: 3.5 },
+                    ],
+                  },
+                },
+                outline_only_samples: [
+                  {
+                    sample: { index: 0, class: 'shaft', x: 0.1, y: 0.1, negative: false },
+                    reason: 'shaft_outline_only',
+                    area_pt2: 30,
+                  },
+                ],
+              }),
+            }),
+            error: null,
+          },
+        })}
+      />,
+    );
+    const signatures = screen.getByTestId('style-hatch-signatures');
+    expect(signatures.textContent).toContain('1 подп., 17 отрезков');
+    expect(signatures.textContent).toContain('угол 45°, шаг 3,5 pt, перо 0,25 pt');
+    const outline = screen.getByRole('region', { name: 'Шахты только контуром' });
+    expect(outline.textContent).toContain('Шахты только контуром: 1 — профиль по ним не меняется');
+    expect(outline.textContent).toContain('Шахта №1');
+  });
+
+  it('старый ответ без новых полей: блоков штриховки и шахт нет', () => {
+    render(
+      <CadStylePanel
+        {...props({ preview: { running: false, result: result(), error: null } })}
+      />,
+    );
+    expect(screen.queryByTestId('style-hatch-signatures')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Шахты только контуром' })).toBeNull();
   });
 
   it('«Принять» отдаёт название версии; при отказе (конфликт) заблокирована', () => {

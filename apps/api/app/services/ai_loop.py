@@ -68,6 +68,7 @@ _HOOK_ERRORS: Final = (
 )
 
 STYLE_ROLE: Final = "style"
+COORDINATION_ROLE: Final = "coordination"
 LOOP_KEY: Final = "ai_loop"
 _ACTIVE: Final = (JobStatus.QUEUED, JobStatus.RUNNING)
 _OPEN: Final = "open"
@@ -193,6 +194,18 @@ async def _chain_reviews(
 
 def _of_role(jobs: Iterable[Job], role: str) -> list[Job]:
     return [job for job in jobs if job.payload.get("role") == role]
+
+
+def _rounds(jobs: Iterable[Job], role: str) -> list[Job]:
+    """Круги роли: проваленные и отменённые проверки в счёт кругов не входят.
+
+    Повтор по тем же конструкциям они всё равно не порождают - это проверяет `_of_role`.
+    """
+    return [
+        job
+        for job in _of_role(jobs, role)
+        if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED)
+    ]
 
 
 async def _read_json_artifact(storage: ObjectStorage, job: Job, name: str) -> dict[str, Any] | None:
@@ -442,10 +455,11 @@ async def _start_verifier(
     verifiers = _of_role(reviews, "verifier")
     if any(job.payload.get("walls_job_id") == str(walls.id) for job in verifiers):
         return None
-    if len(verifiers) >= pilot.max_iterations:
+    rounds = len(_rounds(reviews, "verifier"))
+    if rounds >= pilot.max_iterations:
         return None
     return await ai_review.enqueue_for_walls(
-        session, walls, settings, "verifier", iteration=len(verifiers) + 1
+        session, walls, settings, "verifier", iteration=rounds + 1
     )
 
 
@@ -478,10 +492,11 @@ async def _start_corrector(
         # Второе задание конструкций того же преобразования (пересчёт после авто-зон): правщик
         # у этого преобразования уже был, второго круга пересчёт не порождает.
         return None
-    if len(correctors) >= pilot.max_iterations:
+    rounds = len(_rounds(reviews, "corrector"))
+    if rounds >= pilot.max_iterations:
         return await _start_verifier(session, walls, convert, pilot, settings)
     return await ai_review.enqueue_for_walls(
-        session, walls, settings, "corrector", iteration=len(correctors) + 1
+        session, walls, settings, "corrector", iteration=rounds + 1
     )
 
 
@@ -592,12 +607,41 @@ async def _after_style(
             await _start_corrector(session, walls, convert, pilot, settings)
 
 
-async def after_walls(session: AsyncSession, walls: Job, settings: Settings) -> None:
-    """Успех `cad_walls` пилота: правщик, если у преобразования не ждут классов оформления."""
+async def after_walls(
+    session: AsyncSession,
+    walls: Job,
+    settings: Settings,
+    storage: ObjectStorage | None = None,
+) -> None:
+    """Успех `cad_walls` пилота: правщик, если у преобразования не ждут классов оформления, и
+    лёгкое задание координации осей (эталон «Здания» ищет его исполнитель; отдельный ход: сбой
+    одного не мешает другому)."""
     try:
         await _after_walls_impl(session, walls, settings)
     except _HOOK_ERRORS:
         log.warning("ai_loop_hook_failed", hook="after_walls", job_id=str(walls.id))
+    if storage is None:
+        return
+    from app.cad_worker.handler import CadError  # цикл: исполнитель сам вызывает этот хук
+
+    try:
+        await _coordinate_after_walls(session, storage, walls, settings)
+    except (*_HOOK_ERRORS, OSError, CadError, TypeError):
+        # Чтение осей вида и постановка задания не должны ронять уже завершённые конструкции.
+        log.warning("ai_loop_hook_failed", hook="after_walls_coordination", job_id=str(walls.id))
+
+
+async def _coordinate_after_walls(
+    session: AsyncSession, storage: ObjectStorage, walls: Job, settings: Settings
+) -> None:
+    if pilot_for_project(walls.project_id, settings) is None or walls.job_type is not (
+        JobType.CAD_WALLS
+    ):
+        return
+    from app.services import cad_axis_coordination_jobs  # цикл: модуль берёт пилот отсюда
+
+    async with session.begin_nested():
+        await cad_axis_coordination_jobs.coordinate_for_walls(session, storage, walls, settings)
 
 
 async def _after_walls_impl(session: AsyncSession, walls: Job, settings: Settings) -> None:
@@ -806,7 +850,7 @@ async def _after_corrector(
         return
     if verdict != "needs_correction":
         return  # insufficient_evidence: решает человек
-    if len(_of_role(reviews, "corrector")) >= pilot.max_iterations:
+    if len(_rounds(reviews, "corrector")) >= pilot.max_iterations:
         v_walls, v_convert = await _resolve_best_for_verifier(
             session, walls, convert, best_walls_id
         )

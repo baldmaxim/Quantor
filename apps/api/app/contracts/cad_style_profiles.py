@@ -1,7 +1,8 @@
 """Контракты профиля оформления проектировщика (ADR-0049, решения 1, 2, 5, 6).
 
 Тело профиля - ровно те поля, которые проверяет движок (`material_profiles.check_profile_fields`):
-лишние поля, пропуски и числа вне границ отклоняются, умолчаний API не подставляет. Заголовок
+лишние поля, пропуски и числа вне границ отклоняются; умолчание API - только
+`concrete_hatch_signatures` (`[]`). Заголовок
 `title` в тело не входит: он у версии. Объект `style` для движка собирает сервер.
 """
 
@@ -22,6 +23,7 @@ PROFILE_KEY_PATTERN: Final = r"^[A-Za-z0-9._-]{1,64}$"
 # проверяет только диапазон серых [0, 1], знак толщины и состав полей.
 MAX_GRAYS: Final = 16
 MAX_SHAFT_LABELS: Final = 50
+MAX_HATCH_SIGNATURES: Final = 8
 MAX_SHAFT_LABEL_LENGTH: Final = 32
 MAX_TITLE_LENGTH: Final = 200
 MAX_SAMPLES: Final = 200
@@ -110,11 +112,37 @@ class CadStyleMasonryAcceptance(_Strict):
     )
 
 
+Unit = Annotated[
+    float,
+    Field(ge=0, le=1, allow_inf_nan=False, strict=True),
+    AfterValidator(_reject_negative_zero),
+]
+Positive = Annotated[float, Field(gt=0, allow_inf_nan=False, strict=True)]
+HatchAngle = Annotated[
+    float,
+    Field(ge=0, lt=180, allow_inf_nan=False, strict=True),
+    AfterValidator(_reject_negative_zero),
+]
+
+
+class CadStyleHatchSignature(_Strict):
+    """Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt."""
+
+    color: Annotated[list[Unit], Field(min_length=3, max_length=3)]
+    pen: Positive
+    angle_deg: HatchAngle
+    pitch_pt: Positive
+
+
 class CadStyleProfileBody(_Strict):
     monolith_fill_gray: GrayList
     shaft_fill_gray: GrayList
     masonry_hatch_gray: GrayList
     concrete_hatch_gray: GrayList
+    # Умолчание `[]` только на входе API: в тело для движка поле попадает всегда (model_dump).
+    concrete_hatch_signatures: Annotated[
+        list[CadStyleHatchSignature], Field(max_length=MAX_HATCH_SIGNATURES)
+    ] = Field(default_factory=list)
     alternate_boundary_gray: GrayList
     # Верхний предел 5 - ограничение API против опечаток, движок требует только > 0.
     door_pen_max_width: Annotated[

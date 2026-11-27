@@ -3,6 +3,7 @@
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
+from typing import Final
 
 from sqlalchemy import and_, case, func, literal_column, select
 from sqlalchemy.exc import IntegrityError
@@ -146,6 +147,9 @@ async def activate_version(session: AsyncSession, prompt_id: uuid.UUID) -> AiPro
     return target
 
 
+USAGE_KEYS: Final = ("ai_review", "ai_style", "ai_vor_map", "ai_coordination")
+
+
 def _int(count: int | None) -> int:
     return int(count or 0)
 
@@ -155,14 +159,23 @@ async def stats(session: AsyncSession) -> list[AiPromptStatsRow]:
     versions = await list_versions(session, None)
     prompt_id = Job.payload["prompt_version_id"].astext
     terminal = (JobStatus.SUCCEEDED, JobStatus.FAILED)
+    # Координация без вызова модели (`skipped`, скопированный результат `reused_from`) - не прогон.
     scope = and_(
         Job.job_type == JobType.CAD_AI_REVIEW,
         Job.status.in_(terminal),
         prompt_id.is_not(None),
+        Job.payload[("ai_coordination", "status")].astext.is_distinct_from("skipped"),
+        Job.payload[("ai_coordination", "reused_from")].astext.is_(None),
     )
 
-    cost = Job.payload[("ai_review", "usage", "cost_usd")].as_float()
-    duration = Job.payload[("ai_review", "usage", "duration_ms")].as_float()
+    # Итог роли лежит под своим ключом: `ai_review` (правщик, проверщик), `ai_style`,
+    # `ai_vor_map`, `ai_coordination`; у задания он один.
+    cost = func.coalesce(
+        *(Job.payload[(key, "usage", "cost_usd")].as_float() for key in USAGE_KEYS)
+    )
+    duration = func.coalesce(
+        *(Job.payload[(key, "usage", "duration_ms")].as_float() for key in USAGE_KEYS)
+    )
     verdict = Job.payload[("ai_review", "report", "verdict")].astext
     runs = (
         await session.execute(

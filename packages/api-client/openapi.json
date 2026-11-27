@@ -426,6 +426,60 @@
         "title": "AdminWorkspaceRead",
         "type": "object"
       },
+      "AiCoordinationStart": {
+        "additionalProperties": false,
+        "description": "Ручной запуск координации вида: адрес целевого листа.",
+        "properties": {
+          "page_index": {
+            "minimum": 0.0,
+            "title": "Page Index",
+            "type": "integer"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          },
+          "view": {
+            "minimum": 0.0,
+            "title": "View",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_id",
+          "page_index",
+          "view"
+        ],
+        "title": "AiCoordinationStart",
+        "type": "object"
+      },
+      "AiCoordinationStarted": {
+        "description": "Поставленное (или уже идущее) задание координации; эталон находит исполнитель задания.",
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_walls_job_id": {
+            "format": "uuid",
+            "title": "Target Walls Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "target_walls_job_id"
+        ],
+        "title": "AiCoordinationStarted",
+        "type": "object"
+      },
       "AiFinding": {
         "additionalProperties": false,
         "properties": {
@@ -727,7 +781,8 @@
               "corrector",
               "verifier",
               "vor_mapper",
-              "style"
+              "style",
+              "coordination"
             ],
             "title": "Role",
             "type": "string"
@@ -797,7 +852,8 @@
               "corrector",
               "verifier",
               "vor_mapper",
-              "style"
+              "style",
+              "coordination"
             ],
             "title": "Role",
             "type": "string"
@@ -924,7 +980,8 @@
               "corrector",
               "verifier",
               "vor_mapper",
-              "style"
+              "style",
+              "coordination"
             ],
             "title": "Role",
             "type": "string"
@@ -1036,7 +1093,8 @@
               "corrector",
               "verifier",
               "vor_mapper",
-              "style"
+              "style",
+              "coordination"
             ],
             "title": "Role",
             "type": "string"
@@ -3350,6 +3408,17 @@
             ],
             "title": "Alignment Message"
           },
+          "alignment_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Note"
+          },
           "alignment_rms_mm": {
             "anyOf": [
               {
@@ -3371,6 +3440,15 @@
               }
             ],
             "title": "Alignment Scale Permille"
+          },
+          "alignment_source": {
+            "default": "labels",
+            "enum": [
+              "labels",
+              "ai_coordination"
+            ],
+            "title": "Alignment Source",
+            "type": "string"
           },
           "base_z_mm": {
             "title": "Base Z Mm",
@@ -13821,6 +13899,47 @@
         "title": "CadStageRead",
         "type": "object"
       },
+      "CadStyleHatchSignature": {
+        "additionalProperties": false,
+        "description": "Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.",
+        "properties": {
+          "angle_deg": {
+            "exclusiveMaximum": 180.0,
+            "minimum": 0.0,
+            "title": "Angle Deg",
+            "type": "number"
+          },
+          "color": {
+            "items": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Color",
+            "type": "array"
+          },
+          "pen": {
+            "exclusiveMinimum": 0.0,
+            "title": "Pen",
+            "type": "number"
+          },
+          "pitch_pt": {
+            "exclusiveMinimum": 0.0,
+            "title": "Pitch Pt",
+            "type": "number"
+          }
+        },
+        "required": [
+          "color",
+          "pen",
+          "angle_deg",
+          "pitch_pt"
+        ],
+        "title": "CadStyleHatchSignature",
+        "type": "object"
+      },
       "CadStyleManualSource": {
         "additionalProperties": false,
         "description": "Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).",
@@ -14117,6 +14236,14 @@
             },
             "maxItems": 16,
             "title": "Concrete Hatch Gray",
+            "type": "array"
+          },
+          "concrete_hatch_signatures": {
+            "items": {
+              "$ref": "#/components/schemas/CadStyleHatchSignature"
+            },
+            "maxItems": 8,
+            "title": "Concrete Hatch Signatures",
             "type": "array"
           },
           "door_grid_tolerance": {
@@ -41956,6 +42083,7 @@
           "state": {
             "enum": [
               "pending",
+              "uploading",
               "received",
               "imported",
               "failed",
@@ -42142,11 +42270,16 @@
           "total": {
             "title": "Total",
             "type": "integer"
+          },
+          "uploading": {
+            "title": "Uploading",
+            "type": "integer"
           }
         },
         "required": [
           "total",
           "pending",
+          "uploading",
           "received",
           "imported",
           "failed",
@@ -43972,7 +44105,7 @@
         "operationId": "list_ai_prompts",
         "parameters": [
           {
-            "description": "Роль: corrector, verifier, vor_mapper или style",
+            "description": "Роль: corrector, verifier, vor_mapper, style или coordination",
             "in": "query",
             "name": "role",
             "required": false,
@@ -43983,7 +44116,8 @@
                     "corrector",
                     "verifier",
                     "vor_mapper",
-                    "style"
+                    "style",
+                    "coordination"
                   ],
                   "type": "string"
                 },
@@ -43991,7 +44125,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Роль: corrector, verifier, vor_mapper или style",
+              "description": "Роль: corrector, verifier, vor_mapper, style или coordination",
               "title": "Role"
             }
           }
@@ -50656,6 +50790,59 @@
           }
         },
         "summary": "Общий вид здания: этажи проекта (листы CAD) с отметками и контуром плиты",
+        "tags": [
+          "cad-building3d"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cad/building3d/axis-coordination": {
+      "post": {
+        "operationId": "start_axis_coordination",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiCoordinationStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCoordinationStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Запустить ИИ-координацию осей вида с эталоном «Здания» (пилот)",
         "tags": [
           "cad-building3d"
         ]

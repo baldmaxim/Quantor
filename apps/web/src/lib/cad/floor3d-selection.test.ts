@@ -28,6 +28,13 @@ describe('подсветка нескольких конструкций', () =>
     expect(highlightsOf(plan, new Set())).toEqual([]);
   });
 
+  it('призма плиты подсвечивается и при выборе только дополнительной части slab-2', () => {
+    const ids = highlightsOf(plan, new Set(['slab-2'])).map((item) =>
+      item.kind === 'prism' ? item.spec.id : '',
+    );
+    expect(ids).toEqual(['slab']);
+  });
+
   it('выбранная стена подсвечивает свои перемычки и двери по host_id, чужие - нет', () => {
     const base = withWalls();
     const lintel = base.lintels[0]!;

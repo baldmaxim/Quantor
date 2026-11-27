@@ -228,6 +228,46 @@ export type AdminWorkspaceRead = {
 };
 
 /**
+ * AiCoordinationStart
+ *
+ * Ручной запуск координации вида: адрес целевого листа.
+ */
+export type AiCoordinationStart = {
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Revision Id
+     */
+    revision_id: string;
+    /**
+     * View
+     */
+    view: number;
+};
+
+/**
+ * AiCoordinationStarted
+ *
+ * Поставленное (или уже идущее) задание координации; эталон находит исполнитель задания.
+ */
+export type AiCoordinationStarted = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Target Walls Job Id
+     */
+    target_walls_job_id: string;
+};
+
+/**
  * AiFinding
  */
 export type AiFinding = {
@@ -367,7 +407,7 @@ export type AiPromptCreate = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination';
     /**
      * Text
      */
@@ -401,7 +441,7 @@ export type AiPromptRead = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination';
     /**
      * Status
      */
@@ -477,7 +517,7 @@ export type AiPromptStatsRow = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination';
     /**
      * Runs Failed
      */
@@ -535,7 +575,7 @@ export type AiPromptSummary = {
     /**
      * Role
      */
-    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style';
+    role: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination';
     /**
      * Status
      */
@@ -1731,6 +1771,10 @@ export type CadBuilding3dFloorRead = {
      */
     alignment_message: string | null;
     /**
+     * Alignment Note
+     */
+    alignment_note?: string | null;
+    /**
      * Alignment Rms Mm
      */
     alignment_rms_mm?: number | null;
@@ -1738,6 +1782,10 @@ export type CadBuilding3dFloorRead = {
      * Alignment Scale Permille
      */
     alignment_scale_permille?: number | null;
+    /**
+     * Alignment Source
+     */
+    alignment_source?: 'labels' | 'ai_coordination';
     /**
      * Base Z Mm
      */
@@ -6758,6 +6806,34 @@ export type CadStageRead = {
 };
 
 /**
+ * CadStyleHatchSignature
+ *
+ * Подпись штриховки монолита: цвет RGB (0..1), перо, угол и шаг в pt.
+ */
+export type CadStyleHatchSignature = {
+    /**
+     * Angle Deg
+     */
+    angle_deg: number;
+    /**
+     * Color
+     */
+    color: [
+        number,
+        number,
+        number
+    ];
+    /**
+     * Pen
+     */
+    pen: number;
+    /**
+     * Pitch Pt
+     */
+    pitch_pt: number;
+};
+
+/**
  * CadStyleManualSource
  *
  * Профиль введён вручную: полей снятия по образцам нет (лишнее поле - 422).
@@ -6911,6 +6987,10 @@ export type CadStyleProfileBody = {
      * Concrete Hatch Gray
      */
     concrete_hatch_gray: Array<number>;
+    /**
+     * Concrete Hatch Signatures
+     */
+    concrete_hatch_signatures?: Array<CadStyleHatchSignature>;
     /**
      * Door Grid Tolerance
      */
@@ -21452,7 +21532,7 @@ export type TenderImportItemRead = {
     /**
      * State
      */
-    state: 'pending' | 'received' | 'imported' | 'failed' | 'conflict';
+    state: 'pending' | 'uploading' | 'received' | 'imported' | 'failed' | 'conflict';
 };
 
 /**
@@ -21551,6 +21631,10 @@ export type TenderImportSummary = {
      * Total
      */
     total: number;
+    /**
+     * Uploading
+     */
+    uploading: number;
 };
 
 /**
@@ -22605,9 +22689,9 @@ export type ListAiPromptsData = {
         /**
          * Role
          *
-         * Роль: corrector, verifier, vor_mapper или style
+         * Роль: corrector, verifier, vor_mapper, style или coordination
          */
-        role?: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | null;
+        role?: 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination' | null;
     };
     url: '/api/v1/admin/ai-prompts';
 };
@@ -26661,6 +26745,36 @@ export type ReadCadBuilding3dResponses = {
 };
 
 export type ReadCadBuilding3dResponse = ReadCadBuilding3dResponses[keyof ReadCadBuilding3dResponses];
+
+export type StartAxisCoordinationData = {
+    body: AiCoordinationStart;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v1/projects/{project_id}/cad/building3d/axis-coordination';
+};
+
+export type StartAxisCoordinationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartAxisCoordinationError = StartAxisCoordinationErrors[keyof StartAxisCoordinationErrors];
+
+export type StartAxisCoordinationResponses = {
+    /**
+     * Successful Response
+     */
+    202: AiCoordinationStarted;
+};
+
+export type StartAxisCoordinationResponse = StartAxisCoordinationResponses[keyof StartAxisCoordinationResponses];
 
 export type ListSitePinsData = {
     body?: never;

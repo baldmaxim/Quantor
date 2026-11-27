@@ -466,7 +466,8 @@ def _import_text(data: dict[str, Any]) -> str:
         f"Импорт {data.get('import_id')}: объект «{data.get('project_name')}» "
         f"({data.get('matched_by')}), {data.get('project_url')}. "
         f"Позиций {summary.get('total')}: ждут загрузки {summary.get('pending')}, "
-        f"принято {summary.get('received')}, импортировано {summary.get('imported')}, "
+        f"принимаются {summary.get('uploading')}, принято {summary.get('received')}, "
+        f"импортировано {summary.get('imported')}, "
         f"ошибок {summary.get('failed')}, конфликтов {summary.get('conflict')}. "
         + ("Импорт завершён." if data.get("complete") else "Импорт не завершён.")
     )
@@ -1210,9 +1211,10 @@ TOOLS: dict[str, Tool] = {
             "start_tender_import",
             "Пакетный импорт тендера",
             "Начать пакетный импорт тендерной документации: перечень ZIP-пакетов распознавалки "
-            "(PDF + blocks.json) с хешами. Объект - по tenderhub_id (создаётся, если токену "
-            "разрешено: области upload и tender_import) или по project. Возвращает, что уже "
-            "есть и что догрузить; сами файлы через MCP не передаются.",
+            "(PDF + blocks.json) с хешами. Объект - по tenderhub_id (находится по id или по номеру "
+            "тендера другой версии; создаётся, только если токену разрешено: области upload и "
+            "tender_import) или по project. Возвращает, что уже есть и что догрузить; сами "
+            "файлы через MCP не передаются.",
             {
                 "tenderhub_id": {"type": "string", "description": "id тендера в TenderHUB"},
                 "project": PROJECT_ARG,
@@ -1231,8 +1233,8 @@ TOOLS: dict[str, Tool] = {
         Tool(
             "tender_import_status",
             "Состояние пакетного импорта",
-            "Состояние позиций пакетного импорта по id импорта: ждут загрузки, приняты, "
-            "импортированы, ошибки, конфликты распознавания.",
+            "Состояние позиций пакетного импорта по id импорта: ждут загрузки, принимаются "
+            "сейчас (uploading), приняты, импортированы, ошибки, конфликты распознавания.",
             {"import_id": {"type": "string", "description": "id пакетного импорта"}},
             ["import_id"],
             tender_import_status,

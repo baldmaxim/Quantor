@@ -36,6 +36,9 @@ PROFILE: dict[str, Any] = {
     "shaft_fill_gray": [0.8],
     "masonry_hatch_gray": [0.4],
     "concrete_hatch_gray": [0.3],
+    "concrete_hatch_signatures": [
+        {"color": [0.2, 0.2, 0.2], "pen": 0.25, "angle_deg": 45.0, "pitch_pt": 3.5}
+    ],
     "alternate_boundary_gray": [],
     "door_pen_max_width": 0.5,
     "door_stitch_segments": True,
@@ -297,6 +300,15 @@ async def test_reading_needs_only_read_permission(
         lambda p: p.update(shaft_labels=["x"] * 51),
         lambda p: p.update(shaft_labels=["a\x00b"]),
         lambda p: p.pop("shaft_labels"),
+        lambda p: p["concrete_hatch_signatures"][0].update(extra=1),
+        lambda p: p["concrete_hatch_signatures"][0].update(color=[0.1, 1.5, 0.1]),
+        lambda p: p["concrete_hatch_signatures"][0].update(color=[0.1, 0.1]),
+        lambda p: p["concrete_hatch_signatures"][0].update(angle_deg=180),
+        lambda p: p["concrete_hatch_signatures"][0].update(angle_deg=-1),
+        lambda p: p["concrete_hatch_signatures"][0].update(pen=0),
+        lambda p: p["concrete_hatch_signatures"][0].update(pitch_pt=0),
+        lambda p: p["concrete_hatch_signatures"][0].pop("pitch_pt"),
+        lambda p: p.update(concrete_hatch_signatures=p["concrete_hatch_signatures"] * 9),
         lambda p: p["masonry_acceptance"].pop("min_hatch_lines"),
         lambda p: p["masonry_acceptance"].update(extra=1),
         lambda p: p["masonry_acceptance"].update(min_area_mm2=-1),
@@ -433,3 +445,21 @@ def test_write_contract_has_no_defaults_for_profile_fields() -> None:
     incomplete["profile"].pop("door_grid_tolerance")
     with pytest.raises(ValueError):
         CadStyleVersionWrite.model_validate(incomplete)
+
+
+def test_hatch_signatures_accept_valid_and_limit_is_eight() -> None:
+    valid = body(profile=copy.deepcopy(PROFILE))
+    valid["profile"]["concrete_hatch_signatures"] *= 8
+    parsed = CadStyleVersionWrite.model_validate(valid)
+    assert len(parsed.profile.concrete_hatch_signatures) == 8
+    edge = body(profile=copy.deepcopy(PROFILE))
+    edge["profile"]["concrete_hatch_signatures"][0]["angle_deg"] = 179.9
+    CadStyleVersionWrite.model_validate(edge)
+
+
+def test_hatch_signatures_default_to_empty_and_reach_the_engine_body() -> None:
+    legacy = body()
+    legacy["profile"].pop("concrete_hatch_signatures")
+    parsed = CadStyleVersionWrite.model_validate(legacy)
+    assert parsed.profile.concrete_hatch_signatures == []
+    assert parsed.profile.model_dump(mode="json")["concrete_hatch_signatures"] == []

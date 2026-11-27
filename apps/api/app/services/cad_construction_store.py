@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Collection, Mapping, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any
@@ -27,7 +27,7 @@ from app.contracts.cad_constructions import (
 from app.core.logging import get_logger
 from app.models import CadConstructionProps as CadConstructionPropsRow
 from app.models import CadProjectLevels, CadSheetLevels
-from app.services.cad_constructions import SLAB_ID, ProjectSlab, match_orphan_props
+from app.services.cad_constructions import ProjectSlab, match_orphan_props
 
 log = get_logger(__name__)
 
@@ -89,7 +89,7 @@ async def reconcile_orphan_props(
     page_index: int,
     view: int,
     current: Sequence[WallsConstruction],
-    has_slab: bool,
+    slab_ids: Collection[str],
     older: OlderWalls,
 ) -> PropsLoad:
     """Загружает параметры листа, перенося осиротевшие на конструкции текущего файла.
@@ -101,8 +101,7 @@ async def reconcile_orphan_props(
     """
     props = await load_props(session, revision_id=revision_id, page_index=page_index, view=view)
     known = {c.id for c in current}
-    if has_slab:
-        known.add(SLAB_ID)
+    known.update(slab_ids)
     orphan_keys = {key for key in props if key not in known}
     if not orphan_keys:
         return PropsLoad(props, 0, 0)

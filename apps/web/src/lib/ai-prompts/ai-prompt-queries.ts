@@ -23,11 +23,14 @@ import { unwrap } from '@/lib/queries';
 
 /** Версии промтов ИИ-проверки и статистика прогонов (админка, право `system.admin`). */
 
-export type AiPromptRole = 'corrector' | 'verifier';
+export type AiPromptRole = 'corrector' | 'verifier' | 'vor_mapper' | 'style' | 'coordination';
 
 export const AI_PROMPT_ROLE_LABEL: Readonly<Record<AiPromptRole, string>> = {
   corrector: 'Правщик',
   verifier: 'Проверщик',
+  vor_mapper: 'Сопоставление ВОР',
+  style: 'Оформление',
+  coordination: 'Координация',
 };
 
 const ROOT = ['ai-prompts'] as const;

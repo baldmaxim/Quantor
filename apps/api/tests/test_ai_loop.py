@@ -788,6 +788,55 @@ async def test_rounds_start_over_from_the_new_root_without_hints(
     assert await _reviews(db_session, "verifier") == []
 
 
+@pytest.mark.parametrize("lost", [JobStatus.FAILED, JobStatus.CANCELLED])
+async def test_failed_or_cancelled_corrector_does_not_take_a_round(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+    lost: JobStatus,
+) -> None:
+    """Успешный и упавший правщики на прежних преобразованиях: следующий - второй круг, не третий.
+
+    Лимит 2: с учётом упавшего круги были бы исчерпаны и вместо правщика встал бы проверщик.
+    """
+    ctx = await _context(db_session, fake_storage, build_api, workspace_id)
+    settings = _settings(ctx.project_id, max_iterations=2)
+    await _chain(db_session, ctx, 1)
+    broken_convert = await _convert(db_session, ctx, hints=CHAIN_HINTS, minutes=5)
+    broken_walls = await _walls(db_session, broken_convert)
+    await _review(db_session, broken_walls, "needs_correction", status=lost, minutes=8)
+    last_convert = await _convert(db_session, ctx, hints=CHAIN_HINTS, minutes=10)
+    last = await _walls(db_session, last_convert)
+    await ai_loop.after_walls(db_session, last, settings)
+    await db_session.commit()
+    fresh = [
+        job
+        for job in await _reviews(db_session, "corrector")
+        if job.payload["walls_job_id"] == str(last.id)
+    ]
+    assert [job.payload["iteration"] for job in fresh] == [2]
+    assert await _reviews(db_session, "verifier") == []
+
+
+async def test_failed_corrector_is_not_repeated_on_the_same_walls(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+    workspace_id: uuid.UUID,
+) -> None:
+    """Правщик упал - дедуп по `walls_job_id` остаётся: те же конструкции второго не получают."""
+    ctx = await _context(db_session, fake_storage, build_api, workspace_id)
+    settings = _settings(ctx.project_id)
+    walls = await _walls(db_session, ctx.convert)
+    failed = await _review(db_session, walls, "needs_correction", status=JobStatus.FAILED)
+    await ai_loop.after_walls(db_session, walls, settings)
+    await ai_loop.after_walls(db_session, walls, settings)
+    await db_session.commit()
+    assert [job.id for job in await _reviews(db_session, "corrector")] == [failed.id]
+    assert await _reviews(db_session, "verifier") == []
+
+
 async def test_exhausted_rounds_go_to_the_verifier_instead_of_a_new_rebuild(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],

@@ -4,6 +4,10 @@ import {
   MAX_STYLE_SAMPLES,
   addStyleSample,
   areaText,
+  hatchColorCss,
+  hatchSignatureText,
+  NO_SIGNATURE_HINT,
+  rejectReasonText,
   parseStylePreview,
   profileSourceText,
   removeStyleSample,
@@ -70,6 +74,40 @@ describe('разбор preview', () => {
     expect(parsed?.classes?.monolith.area_m2).toBeNull();
     expect(parsed?.classes?.shaft.area_m2).toBe(1.5);
     expect(parsed?.rejected_samples[0]?.reason).toBe('no_arc_at_point');
+  });
+
+  it('новые поля превью разбираются; без них старый ответ разбирается как раньше', () => {
+    const signature = { color: [0.2, 0.4, 0.6], pen: 0.25, angle_deg: 45, pitch_pt: 3.5 };
+    const parsed = parseStylePreview({
+      ...goodPreview,
+      classes: {
+        ...goodPreview.classes,
+        monolith: { ...goodPreview.classes.monolith, hatch_signatures: [signature], hatch_segments: 9 },
+      },
+      outline_only_samples: [
+        {
+          sample: { index: 0, class: 'shaft', x: 0.1, y: 0.2, negative: false },
+          reason: 'shaft_outline_only',
+          area_pt2: 12.5,
+        },
+      ],
+    });
+    expect(parsed?.classes?.monolith.hatch_signatures).toEqual([signature]);
+    expect(parsed?.classes?.monolith.hatch_segments).toBe(9);
+    expect(parsed?.outline_only_samples?.[0]?.area_pt2).toBe(12.5);
+    const old = parseStylePreview(goodPreview);
+    expect(old).not.toBeNull();
+    expect(old?.classes?.monolith.hatch_signatures).toBeUndefined();
+    expect(old?.outline_only_samples).toBeUndefined();
+  });
+
+  it('подписи штриховки и причина отказа', () => {
+    expect(hatchColorCss([1, 0, 0.5])).toBe('rgb(255, 0, 128)');
+    expect(hatchSignatureText({ color: [0, 0, 0], pen: 0.25, angle_deg: 45, pitch_pt: 3.5 })).toBe(
+      'угол 45°, шаг 3,5 pt, перо 0,25 pt',
+    );
+    expect(rejectReasonText('no_fill_or_hatch_at_point')).toBe('Ни заливки, ни штриховки в точке');
+    expect(NO_SIGNATURE_HINT).toContain('по дуге или внутри сектора открывания');
   });
 
   it('без признаков: classes и field_sources - null', () => {

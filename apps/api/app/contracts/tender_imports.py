@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 MAX_ITEMS = 500
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
-ItemState = Literal["pending", "received", "imported", "failed", "conflict"]
+ItemState = Literal["pending", "uploading", "received", "imported", "failed", "conflict"]
 MatchedBy = Literal["project_id", "tenderhub_id", "tender_number", "created"]
 
 
@@ -78,6 +78,7 @@ class TenderImportStart(BaseModel):
 class TenderImportSummary(BaseModel):
     total: int
     pending: int
+    uploading: int
     received: int
     imported: int
     failed: int

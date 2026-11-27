@@ -99,6 +99,22 @@ describe('промты ИИ', () => {
     expect(await screen.findByText('1 / 1 / 1')).toBeTruthy();
   });
 
+  it('даёт вкладки всех ролей, включая оформление и координацию', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Текст p-1');
+    for (const [label, role] of [
+      ['Сопоставление ВОР', 'vor_mapper'],
+      ['Оформление', 'style'],
+      ['Координация', 'coordination'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: label }));
+      await waitFor(() =>
+        expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ query: { role } })),
+      );
+    }
+  });
+
   it('без права system.admin доступа нет', async () => {
     setup([]);
     expect(await screen.findByText('Нет доступа')).toBeTruthy();

@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 from typing import Final, get_args
 
 from pydantic import TypeAdapter
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -164,12 +164,13 @@ async def resolve_project(
     if by_id is not None:
         return ResolvedProject(by_id, "tenderhub_id", tenderhub_id)
 
-    # Запрос в TenderHUB - только с областью tender_import: токен upload и чат OAuth права читать
-    # TenderHUB не имеют, перебирать по ним id тендеров нельзя.
-    if Permission.TENDER_IMPORT_CREATE_PROJECT not in context.permissions:
-        raise DomainError(ErrorCode.TENDER_IMPORT_CREATE_FORBIDDEN)
+    may_create = Permission.TENDER_IMPORT_CREATE_PROJECT in context.permissions
     if client is None:
-        raise DomainError(ErrorCode.TENDERHUB_DISABLED)
+        raise DomainError(
+            ErrorCode.TENDERHUB_DISABLED if may_create else ErrorCode.TENDER_IMPORT_CREATE_FORBIDDEN
+        )
+    # Объект мог быть заведён по другой версии того же тендера: номер берётся из TenderHUB и для
+    # токена без области tender_import - он только ищет, создать объект ему нельзя.
     # Номер и название берутся только из ответа TenderHUB, а не от клиента. Сеть - до блокировки.
     tender = await client.get_tender(tenderhub_id)
 
@@ -182,10 +183,7 @@ async def resolve_project(
     if found is not None:
         return ResolvedProject(found[0], found[1], tenderhub_id)
 
-    if (
-        Permission.TENDER_IMPORT_CREATE_PROJECT not in context.permissions
-        or Permission.PROJECT_CREATE not in permissions_for(context.role)
-    ):
+    if not may_create or Permission.PROJECT_CREATE not in permissions_for(context.role):
         raise DomainError(ErrorCode.TENDER_IMPORT_CREATE_FORBIDDEN)
 
     # Два параллельных импорта одного тендера не должны завести два объекта.
@@ -384,13 +382,12 @@ def render(
     for item in ordered:
         view = views[item.id]
         counts[view.state] += 1
-        # Упавшую позицию досылать имеет смысл при повторяемом отказе (те же байты повторят
-        # задание) и при отмене (пересобранный ZIP - новый пакет). Отказ по содержимому
-        # (битый blocks.json) при том же blocks повторится и только добавит документ-пакет.
+        # Упавшую позицию досылать имеет смысл только при повторяемом отказе: те же байты
+        # вернут то же задание в очередь. Отказ по содержимому (битый blocks.json) повторится,
+        # а отменённое задание из очереди не возвращается - дослать тот же ZIP значило бы
+        # получать «принято» по кругу. Их решает человек.
         if view.state == "pending" or (
-            view.state == "failed"
-            and view.job is not None
-            and (view.job.status is JobStatus.CANCELLED or jobs_service.is_retryable(view.job))
+            view.state == "failed" and view.job is not None and jobs_service.is_retryable(view.job)
         ):
             to_upload.append(item.item_key)
         reads.append(
@@ -421,10 +418,16 @@ def render(
         tenderhub_id=import_row.tenderhub_id,
         matched_by=matched_by,
         created=created,
-        complete=counts["pending"] == 0 and counts["received"] == 0,
+        complete=(
+            counts["pending"] == 0
+            and counts["uploading"] == 0
+            and counts["received"] == 0
+            and not to_upload
+        ),
         summary=TenderImportSummary(
             total=len(ordered),
             pending=counts["pending"],
+            uploading=counts["uploading"],
             received=counts["received"],
             imported=counts["imported"],
             failed=counts["failed"],
@@ -450,6 +453,32 @@ async def _load_items(session: AsyncSession, import_id: uuid.UUID) -> list[Tende
         .execution_options(populate_existing=True)
     )
     return list(rows.scalars())
+
+
+async def _free_item_ids(session: AsyncSession, import_id: uuid.UUID) -> set[uuid.UUID]:
+    """Позиции, файл которых сейчас не принимается (`lock_item` загрузки строку не держит).
+
+    FOR KEY SHARE конфликтует только с FOR UPDATE загрузки: параллельные статус и запуск друг
+    друга занятыми не видят. SKIP LOCKED не ждёт - занятая строка просто не попадает в ответ.
+    Свободная строка остаётся под блокировкой до конца транзакции: загрузка её не возьмёт, пока
+    запуск переписывает имя и хеш (UPDATE двух запусков ждёт лишь коротко, без взаимоблокировки).
+    """
+    rows = await session.execute(
+        select(TenderImportItem.id)
+        .where(TenderImportItem.import_id == import_id)
+        .with_for_update(skip_locked=True, read=True, key_share=True)
+    )
+    return set(rows.scalars())
+
+
+def _mark_uploading(
+    views: dict[uuid.UUID, ItemView], items: Sequence[TenderImportItem], free: set[uuid.UUID]
+) -> None:
+    """Позиция, ждущая файла, чей ZIP сейчас принимается, - `uploading`: досылать её не надо."""
+    for item in items:
+        view = views[item.id]
+        if item.id not in free and view.state in ("pending", "failed"):
+            views[item.id] = ItemView(state="uploading", job=view.job)
 
 
 # --------------------------------------------------------------------------- запуск и статус
@@ -516,34 +545,30 @@ async def start(
             for item in payload.items
         )
         await session.flush()
+        free = None
+    else:
+        # Свободные позиции блокируются до конца запуска, занятые загрузкой не ждём.
+        free = await _free_item_ids(session, import_row.id)
 
+    # Позиции читаются после блокировки: загрузка, закончившаяся раньше, уже видна.
     items = await _load_items(session, import_row.id)
     views = await compute_states(session, project_id=project.id, items=items)
 
-    if not created:
+    if free is not None:
         # ZIP мог быть пересобран: у ожидающих и упавших позиций обновляются имя, размер и хеш.
-        # Принятые позиции не трогаются.
-        # Условие по прежней ревизии пакета: если параллельная загрузка уже приняла файл позиции
-        # (держит строку под блокировкой), UPDATE дождётся её и строку не перепишет.
+        # Принятые позиции и позиции, чей файл сейчас принимается, не трогаются.
         incoming = {item.key: item for item in payload.items}
         for row in items:
             new = incoming.get(row.item_key)
-            if new is None or views[row.id].state not in ("pending", "failed"):
+            if (
+                new is None
+                or row.id not in free
+                or views[row.id].state not in ("pending", "failed")
+            ):
                 continue
-            same_package = (
-                TenderImportItem.package_revision_id.is_(None)
-                if row.package_revision_id is None
-                else TenderImportItem.package_revision_id == row.package_revision_id
-            )
-            await session.execute(
-                update(TenderImportItem)
-                .where(TenderImportItem.id == row.id, same_package)
-                .values(filename=new.filename, size=new.size, sha256=new.sha256)
-                .execution_options(synchronize_session=False)
-            )
-            await session.refresh(row)
-        # UPDATE мог ждать параллельную загрузку позиции: состояние считается заново.
-        views = await compute_states(session, project_id=project.id, items=items)
+            row.filename, row.size, row.sha256 = new.filename, new.size, new.sha256
+        await session.flush()
+        _mark_uploading(views, items, free)
 
     read = render(
         settings=settings,
@@ -565,8 +590,10 @@ async def get_status(
     )
     if project is None:
         raise DomainError(ErrorCode.TENDER_IMPORT_NOT_FOUND)
+    free = await _free_item_ids(session, import_row.id)
     items = await _load_items(session, import_row.id)
     views = await compute_states(session, project_id=project.id, items=items)
+    _mark_uploading(views, items, free)
     return render(
         settings=settings,
         import_row=import_row,

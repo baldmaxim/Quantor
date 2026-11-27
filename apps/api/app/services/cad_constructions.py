@@ -41,9 +41,9 @@
   (`opening_height_mm`) считается как разрыв с известной высотой. Окно с высотой по ПРИНЯТОМУ виду
   фасада (ADR-0048, `window_heights`) вычитается пустотой `head - sill` (кладка под подоконником
   и над окном остаётся), перемычка над ним - от `head`; вид-кандидат не вычитается;
-- плита перекрытия (`floor_slab`, одна на лист): площадь нетто = контур минус включённые
-  отверстия; толщина = переопределение человека, иначе толщина плиты листа; объём = нетто x
-  толщина; нет толщины — `thickness_check`, в итоги не входит.
+- плита перекрытия (`floor_slab`; по конструкции на часть плиты листа: `slab`, `slab-N`): площадь
+  нетто = контур минус включённые отверстия; толщина = переопределение человека, иначе толщина
+  плиты листа; объём = нетто x толщина; нет толщины — `thickness_check`, в итоги не входит.
 """
 
 from __future__ import annotations
@@ -81,6 +81,7 @@ from app.contracts.cad_constructions import (
     WallsOpening,
     WallsPolygon,
 )
+from app.contracts.cad_floor3d import WallsSlab
 from app.services.cad_facade_windows import FacadeWindowHeight
 
 KIND_ORDER: Final[tuple[CadConstructionKind, ...]] = (
@@ -1059,8 +1060,28 @@ class SheetResult:
 
 PropsByKey = Mapping[str, tuple[CadConstructionProps, bool]]
 
-# Адрес плиты листа в параметрах конструкций (у файла без `id` у плиты — он же).
+# Адрес плиты листа в параметрах конструкций (у файла без `id` у плиты — он же). У листа из
+# нескольких частей плиты это адрес основной (самой большой) части; прочие — `slab-N`.
 SLAB_ID: Final = "slab"
+
+
+def slab_main_index(slab: WallsSlab) -> int:
+    """Индекс основной части плиты в `parts` (контур совпадает с `slab.shell`); нет - первая."""
+    return next((i for i, part in enumerate(slab.parts) if part.shell == slab.shell), 0)
+
+
+def slab_ids(slab: WallsSlab | None) -> list[str]:
+    """Адреса конструкций плиты листа: основная часть — `slab`, остальные — `slab-{i+1}`.
+
+    Номер - позиция части в `parts` плюс один (`slab-2`, `slab-3`...). Нет плиты - пусто; плита без
+    `parts` (старый файл) или из одной части - один адрес `slab`.
+    """
+    if slab is None:
+        return []
+    if len(slab.parts) <= 1:
+        return [SLAB_ID]
+    main = slab_main_index(slab)
+    return [SLAB_ID if i == main else f"{SLAB_ID}-{i + 1}" for i in range(len(slab.parts))]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1242,15 +1263,16 @@ def compute_sheet(
     props_by_key: PropsByKey,
     overrides: CadSheetLevelsRead,
     project_slab: ProjectSlab | None = None,
-    slab: SlabInput | None = None,
+    slabs: Sequence[SlabInput] = (),
     partition: PartitionContext | None = None,
     window_heights: Mapping[str, FacadeWindowHeight] | None = None,
 ) -> SheetResult:
     """Конструкции листа с величинами и итоги по группам (вид x толщина x материал).
 
-    `slab` — плита перекрытия листа; её добавляют в конец списка и считают как конструкцию.
-    Без неё (3D-вид, общий вид здания) поведение прежнее. `partition` — зоны помещений и принятая
-    высота маячного ряда; без него высота перегородок - как у остальных стен листа.
+    `slabs` — части плиты перекрытия листа (одна, а у листа из двух корпусов несколько); их
+    добавляют в конец списка и считают как конструкции. Без них (3D-вид, общий вид здания)
+    поведение прежнее. `partition` — зоны помещений и принятая высота маячного ряда;
+    без него высота перегородок - как у остальных стен листа.
     `window_heights` — высоты окон без `opening_height_mm` по видам фасадов (ADR-0048): в объём
     входят только окна с ПРИНЯТЫМ видом (вычитается пустота `head - sill`); окно с высотой только
     из непринятого вида считается как без высоты, а в предупреждения листа идёт кандидат.
@@ -1330,8 +1352,13 @@ def compute_sheet(
                 accepted=accepted,
             )
         )
-    if slab is not None:
-        slab_props, slab_accepted = props_by_key.get(slab.id, (CadConstructionProps(), False))
+    for slab in slabs:
+        # Параметры не основной части плиты (`slab-N`), пока своих нет, - как у основной (`slab`);
+        # принятие не наследуется: каждую часть принимает человек отдельно.
+        own_entry = props_by_key.get(slab.id)
+        inherited = own_entry or props_by_key.get(SLAB_ID)
+        slab_props = inherited[0] if inherited else CadConstructionProps()
+        slab_accepted = own_entry[1] if own_entry else False
         slab_material = _slab_material(slab_props)
         slab_computed = compute_slab(slab, slab_props, levels)
         if slab_computed.status == "thickness_check":
@@ -1398,7 +1425,7 @@ def compute_sheet(
     )
     totals[after_monolith:after_monolith] = lintel_totals
     summary = CadConstructionsSummaryRead(
-        total_count=len(items_all) + (0 if slab is None else 1),
+        total_count=len(items_all) + len(slabs),
         thickness_check_count=check_count,
         height_missing_count=height_missing_count,
         unaccounted_gap_openings=sum(

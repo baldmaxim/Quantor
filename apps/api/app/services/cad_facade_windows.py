@@ -202,12 +202,59 @@ def _contour_direction(points: Sequence[Point]) -> Point | None:
     return _unit(chosen[0], chosen[1])
 
 
+def _distance_to_ring(x: float, y: float, ring: Sequence[Sequence[float]]) -> float:
+    """Расстояние от точки до границы кольца (до ближайшего ребра), мм."""
+    best = math.inf
+    n = len(ring)
+    for i in range(n):
+        x0, y0 = ring[i][0], ring[i][1]
+        x1, y1 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+        dx, dy = x1 - x0, y1 - y0
+        length2 = dx * dx + dy * dy
+        t = (
+            0.0
+            if length2 < 1e-12
+            else max(0.0, min(1.0, ((x - x0) * dx + (y - y0) * dy) / length2))
+        )
+        best = min(best, math.hypot(x - (x0 + t * dx), y - (y0 + t * dy)))
+    return best
+
+
+def _outward_by_slab(
+    center: Point, normal: Point, slab_rings: Sequence[Sequence[Sequence[float]]]
+) -> Point | None:
+    """Наружная нормаль по частям плиты: у окна её даёт ближайшая часть, у которой одна из двух
+    проб по нормали внутри, другая снаружи; такой части нет - `None`.
+
+    Часть плиты берётся целиком отдельно: проба у стены одной части может попасть в соседнюю
+    часть через узкий зазор между корпусами, поэтому «внутри» по объединению частей не считается.
+    """
+    best: tuple[float, Point] | None = None
+    for ring in slab_rings:
+        plus = point_in_ring(
+            center[0] + normal[0] * OUTWARD_PROBE_MM, center[1] + normal[1] * OUTWARD_PROBE_MM, ring
+        )
+        minus = point_in_ring(
+            center[0] - normal[0] * OUTWARD_PROBE_MM, center[1] - normal[1] * OUTWARD_PROBE_MM, ring
+        )
+        if plus == minus:
+            continue
+        outward = (-normal[0], -normal[1]) if plus else normal
+        distance = _distance_to_ring(center[0], center[1], ring)
+        if best is None or distance < best[0]:
+            best = (distance, outward)
+    return None if best is None else best[1]
+
+
 def _plan_window(
     opening: WallsOpening,
     extra: WallsOpeningExtras | None,
-    slab_shell: Sequence[Sequence[float]],
+    slab_rings: Sequence[Sequence[Sequence[float]]],
 ) -> _PlanWindow | None:
-    """Окно плана: контур проёма, центр и наружная нормаль по плите; нет контура - `None`."""
+    """Окно плана: контур проёма, центр и наружная нормаль по плите; нет контура - `None`.
+
+    `slab_rings` - контуры всех частей плиты листа (у листа из двух корпусов их два).
+    """
     raw = opening.lintel if opening.lintel else (None if extra is None else extra.lintel)
     if raw is None or len(raw) < 3 or any(len(p) < 2 for p in raw):
         return None
@@ -224,23 +271,7 @@ def _plan_window(
     if along is None:
         return _PlanWindow(opening.id, points, center, None)
     normal = (-along[1], along[0])
-    plus = point_in_ring(
-        center[0] + normal[0] * OUTWARD_PROBE_MM,
-        center[1] + normal[1] * OUTWARD_PROBE_MM,
-        slab_shell,
-    )
-    minus = point_in_ring(
-        center[0] - normal[0] * OUTWARD_PROBE_MM,
-        center[1] - normal[1] * OUTWARD_PROBE_MM,
-        slab_shell,
-    )
-    outward: Point | None
-    if not plus and minus:
-        outward = normal
-    elif plus and not minus:
-        outward = (-normal[0], -normal[1])
-    else:
-        outward = None
+    outward = _outward_by_slab(center, normal, slab_rings)
     return _PlanWindow(opening.id, points, center, outward)
 
 
@@ -479,7 +510,7 @@ def match_sheet_windows(
     *,
     openings: Sequence[WallsOpening],
     extras: Sequence[WallsOpeningExtras],
-    slab_shell: Sequence[Sequence[float]] | None,
+    slab_rings: Sequence[Sequence[Sequence[float]]] | None,
     vertical_axes: Mapping[str, float],
     horizontal_axes: Mapping[str, float],
     corps: str | None,
@@ -511,13 +542,14 @@ def match_sheet_windows(
         return FacadeMatch(issues=tuple(invalid))
     if not level.elevation_known or level.floor_z_mm is None or not level.floor_height_mm:
         return FacadeMatch(issues=(MatchIssue(CODE_NO_LEVEL, _MESSAGES[CODE_NO_LEVEL]), *invalid))
-    if slab_shell is None or len(slab_shell) < 3:
+    rings = [ring for ring in slab_rings or () if len(ring) >= 3]
+    if not rings:
         return FacadeMatch(issues=(MatchIssue(CODE_NO_SLAB, _MESSAGES[CODE_NO_SLAB]), *invalid))
     extra_by_id = {item.id: item for item in extras}
     windows = [
         w
         for o in openings
-        if o.kind == "window" and (w := _plan_window(o, extra_by_id.get(o.id), slab_shell))
+        if o.kind == "window" and (w := _plan_window(o, extra_by_id.get(o.id), rings))
     ]
     pending_ids = {o.id for o in pending}
     issues: list[MatchIssue] = list(invalid)
@@ -616,7 +648,7 @@ def sheet_window_heights(
     loaded: LoadedViews,
     openings: Sequence[WallsOpening],
     extras: Sequence[WallsOpeningExtras],
-    slab_shell: Sequence[Sequence[float]] | None,
+    slab_rings: Sequence[Sequence[Sequence[float]]] | None,
     axes: SheetAxes | None,
     corps: str | None,
     section: str | None,
@@ -643,7 +675,7 @@ def sheet_window_heights(
         match = match_sheet_windows(
             openings=openings,
             extras=extras,
-            slab_shell=slab_shell,
+            slab_rings=slab_rings,
             vertical_axes=vertical,
             horizontal_axes=horizontal,
             corps=corps,

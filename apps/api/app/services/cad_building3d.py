@@ -42,6 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contracts.cad import CadFrameRead
+from app.contracts.cad_ai_coordination import AxisOrient
 from app.contracts.cad_building3d import (
     CadBuilding3dFloorRead,
     CadBuilding3dGroupRead,
@@ -94,6 +95,10 @@ DEFAULT_FLOOR_HEIGHT_MM: Final = 3000
 DEFAULT_SLAB_THICKNESS_MM: Final = 200
 # Допуск расхождения смещений по общим осям: больше - оси разных этажей «не сходятся».
 AXIS_TOLERANCE_MM: Final = 150.0
+# Согласных подписей в каждом направлении, с которых совмещение по подписям считается уверенным
+# и координация ИИ его не перебивает (одна подпись - только при перекрытии не меньше
+# `SINGLE_AXIS_MIN_OVERLAP`).
+CONFIDENT_LABELS: Final = 2
 # Минимальная доля перекрытия bbox совмещённого этажа с эталоном (от меньшего bbox).
 MIN_ALIGN_OVERLAP: Final = 0.3
 # Единственная общая марка по направлению (при двух и более осях у обоих этажей) - слабая опора
@@ -297,6 +302,16 @@ def wall_ring(shell: Sequence[Sequence[float]]) -> list[list[int]] | None:
 # --------------------------------------------------------------------------- лист -> этаж
 
 
+_WALLS_KEY_JOB: Final = re.compile(r"/cad/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})/attempt-")
+
+
+def walls_job_id_of_key(key: str | None) -> uuid.UUID | None:
+    """Идентификатор задания конструкций из ключа `walls.json`
+    (`revisions/<ревизия>/cad/<задание>/attempt-N/...`); нет ключа или он иной - `None`."""
+    found = None if key is None else _WALLS_KEY_JOB.search(key)
+    return None if found is None else uuid.UUID(found.group(1))
+
+
 @dataclass(frozen=True, slots=True)
 class SheetRef:
     """Лист CAD, собранный из базы: адрес, подпись, высоты от человека и ключ walls.json."""
@@ -327,6 +342,11 @@ class SheetRef:
     passport_floor_to: int | None = None
     # Показан прежний прогон листа (у нового конструкций ещё нет): текст предупреждения.
     previous_run_note: str | None = None
+
+    @property
+    def walls_job_id(self) -> uuid.UUID | None:
+        """Задание конструкций, чей `walls.json` взят для листа (из ключа артефакта)."""
+        return walls_job_id_of_key(self.walls_key)
 
 
 # «Секции 8, 9, 10, 15-16, 17, …»: перечень секций через запятую в названии листа.
@@ -839,7 +859,8 @@ class WindowSource:
 
     openings: tuple[WallsOpening, ...]
     extras: tuple[WallsOpeningExtras, ...]
-    slab_shell: list[list[float]] | None
+    # Контуры всех частей плиты листа; пусто - плиты в файле нет.
+    slab_rings: list[list[list[float]]]
     corps: str | None
     section: str | None
     level: SheetLevel
@@ -854,10 +875,71 @@ class WindowSource:
         """Вес в кеше этажа: число точек контуров проёмов, плиты листа и осей."""
         return (
             sum(len(item.lintel or ()) for item in self.extras)
-            + len(self.slab_shell or ())
+            + sum(len(ring) for ring in self.slab_rings)
             + len(self.axes.vertical)
             + len(self.axes.horizontal)
         )
+
+
+_AXIS_ID_PREFIX: Final = {"vertical": "V", "horizontal": "H"}
+
+
+def coordination_axes(raw_walls: Any, frame: CadFrameRead) -> list[CoordAxis]:
+    """Оси вида с идентификаторами: вертикальные `V1..Vn` слева направо, горизонтальные `H1..Hn`
+    снизу вверх (по возрастанию мм кадра).
+
+    В отличие от `axes_in_mm` подпись, встретившаяся у двух осей дальше допуска друг от друга, не
+    отбрасывается: это разные оси с разными идентификаторами (так и ошибается чтение подписей).
+    Повторы одной оси (кружки на обоих концах) в пределах допуска усредняются. Нет подтверждённого
+    кадра или осей - пустой список.
+    """
+    block = raw_walls.get("axes") if isinstance(raw_walls, dict) else None
+    origin, factor = frame.origin_pt, frame.mm_per_pdf_point
+    if (
+        not isinstance(block, dict)
+        or not frame.confirmed
+        or origin is None
+        or factor is None
+        or factor <= 0
+    ):
+        return []
+    grouped: dict[tuple[str, str], list[tuple[float, float]]] = {}
+    for label, orient, pos in _axis_rows(block.get("items")):
+        mm = (pos - origin[0]) * factor if orient == "vertical" else (origin[1] - pos) * factor
+        grouped.setdefault((orient, label), []).append((mm, pos))
+    found: list[tuple[str, str, float, float]] = []
+
+    def merged(orient: str, label: str, cluster: Sequence[tuple[float, float]]) -> None:
+        mm = sum(item[0] for item in cluster) / len(cluster)
+        pt = sum(item[1] for item in cluster) / len(cluster)
+        found.append((orient, label, mm, pt))
+
+    for (orient, label), rows in grouped.items():
+        rows.sort()
+        cluster: list[tuple[float, float]] = []
+        for row in rows:
+            if cluster and row[0] - cluster[0][0] > AXIS_TOLERANCE_MM:
+                merged(orient, label, cluster)
+                cluster = []
+            cluster.append(row)
+        merged(orient, label, cluster)
+    axes: list[CoordAxis] = []
+    for orient in ("vertical", "horizontal"):
+        ordered = sorted(
+            (row for row in found if row[0] == orient),
+            key=lambda row: (row[2], _natural_key(row[1])),
+        )
+        for number, (_, label, mm, pt) in enumerate(ordered, start=1):
+            axes.append(
+                CoordAxis(
+                    id=f"{_AXIS_ID_PREFIX[orient]}{number}",
+                    label=label,
+                    orient="vertical" if orient == "vertical" else "horizontal",
+                    pos_mm=mm,
+                    pos_pt=pt,
+                )
+            )
+    return axes
 
 
 def window_source(
@@ -880,7 +962,7 @@ def window_source(
     return WindowSource(
         openings=windows,
         extras=tuple(item for item in extras.openings if item.id in ids),
-        slab_shell=None if extras.slab is None else extras.slab.shell,
+        slab_rings=[] if extras.slab is None else extras.slab.rings,
         corps=None if title is None else title.corps,
         section=None if title is None else title.section,
         level=SheetLevel(
@@ -900,6 +982,50 @@ CoreRing = tuple[tuple[int, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
+class CoordinationPair:
+    """Пара осей из координации ИИ: подписи как прочитаны и положения в мм кадров своих видов."""
+
+    orient: str
+    target_label: str
+    reference_label: str
+    target_mm: float
+    reference_mm: float
+    residual_mm: float
+
+
+ViewKey = tuple[uuid.UUID, int, int]
+
+
+@dataclass(frozen=True, slots=True)
+class CoordinationHint:
+    """Смещение вида в систему эталона из успешной координации (`status = ok`), поворот 0.
+
+    Действует для пары видов (цель, эталон): пары осей из задания применены к ТЕКУЩИМ осям обоих
+    видов (отпечатки осей совпали), смещение пересчитано кодом (`cad_axis_coordination`). Другой
+    эталон - иной вид, прежний путь совмещения по подписям.
+    """
+
+    reference_view: ViewKey
+    offset_mm: Point
+    pairs: tuple[CoordinationPair, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CoordAxis:
+    """Ось вида: идентификатор, подпись как прочитана, направление и положение.
+
+    `pos_mm` - в мм кадра вида (как `axes_in_mm`), `pos_pt` - на странице PDF (для подписи
+    идентификатора на рисунке; модели не отдаётся).
+    """
+
+    id: str
+    label: str
+    orient: AxisOrient
+    pos_mm: float
+    pos_pt: float
+
+
+@dataclass(frozen=True, slots=True)
 class BuiltFloor:
     floor: CadBuilding3dFloorRead
     order: tuple[float, float, int, int]
@@ -912,6 +1038,12 @@ class BuiltFloor:
     hint: tuple[str | None, str | None] = (None, None)
     # Вид этажа → сетка осей утверждённой модели (`cad_building3d_grid`); модели нет - `None`.
     grid: GridFit | None = None
+    # Оси вида с устойчивыми идентификаторами (координация ИИ); без кадра или осей - пусто.
+    coord_axes: tuple[CoordAxis, ...] = ()
+    # Координация ИИ, применимая к этому виду как цели (по эталонам), и причины, по которым
+    # сохранённая координация эталона не применена: эталон -> текст для `alignment_note`.
+    coordination: tuple[CoordinationHint, ...] = ()
+    coordination_notes: tuple[tuple[ViewKey, str], ...] = ()
 
 
 def _agreed(diffs: dict[str, float]) -> tuple[list[str], int]:
@@ -1287,7 +1419,134 @@ def _turned_match(base: FloorAxes, ours: FloorAxes) -> _TurnedMatch | None:
     return best
 
 
+def view_key_of(floor: CadBuilding3dFloorRead) -> ViewKey:
+    return floor.revision_id, floor.page_index, floor.view
+
+
+def _coordination_for(item: BuiltFloor, reference: BuiltFloor) -> CoordinationHint | None:
+    """Координация ИИ для пары видов (цель, эталон); нет - `None`."""
+    key = view_key_of(reference.floor)
+    return next((h for h in item.coordination if h.reference_view == key), None)
+
+
+def _hint_axes(hint: CoordinationHint) -> tuple[FloorAxes, FloorAxes]:
+    """Оси эталона и цели, ключ - номер пары: те же пары для `_scale_ratio` при разных подписях."""
+    base: dict[str, dict[str, float]] = {"vertical": {}, "horizontal": {}}
+    ours: dict[str, dict[str, float]] = {"vertical": {}, "horizontal": {}}
+    for number, pair in enumerate(hint.pairs):
+        base[pair.orient][str(number)] = pair.reference_mm
+        ours[pair.orient][str(number)] = pair.target_mm
+    return (
+        FloorAxes(base["vertical"], base["horizontal"], None),
+        FloorAxes(ours["vertical"], ours["horizontal"], None),
+    )
+
+
+def _align_by_coordination(
+    item: BuiltFloor, reference: BuiltFloor, hint: CoordinationHint
+) -> CadBuilding3dFloorRead:
+    """Совмещение по смещению из координации ИИ (пары назвала модель, мм посчитал движок).
+
+    Масштаб листа и перекрытие с эталоном проверяются, как при совмещении по подписям: отказ -
+    этаж не совмещён с причиной (прежний путь по подписям здесь не пробуется: он и ошибся).
+    """
+    base, ours = _hint_axes(hint)
+    ratio = _scale_ratio(base, ours)
+    permille = None if ratio is None else _permille(ratio)
+    if ratio is not None and permille is not None and abs(permille) > SCALE_FAIL_PERMILLE:
+        return _fallback(item, reference, _scale_message(ratio), permille)
+    dx, dy = hint.offset_mm
+    shifted = _shifted(item.floor, dx, dy)
+    shown = [
+        f"{pair.target_label}→{pair.reference_label} "
+        f"({LABEL_DIRECTION_VERTICAL if pair.orient == 'vertical' else LABEL_DIRECTION_HORIZONTAL})"
+        for pair in hint.pairs
+    ]
+    if shifted.bbox is not None and reference.floor.bbox is not None:
+        share = _overlap_share(shifted.bbox, reference.floor.bbox)
+        if share < MIN_ALIGN_OVERLAP:
+            return _fallback(
+                item,
+                reference,
+                f"после совмещения по осям, сопоставленным ИИ ({', '.join(shown)}), этаж не "
+                f"перекрывает эталон ({share:.0%})",
+            )
+    residuals = [pair.residual_mm for pair in hint.pairs]
+    return shifted.model_copy(
+        update={
+            "alignment": "axes",
+            "alignment_axes": shown,
+            "alignment_message": None,
+            "alignment_rms_mm": round(math.sqrt(sum(r * r for r in residuals) / len(residuals)), 1),
+            "alignment_max_mm": round(max(abs(r) for r in residuals), 1),
+            "alignment_axes_common": len(hint.pairs),
+            "alignment_scale_permille": permille,
+            "alignment_source": "ai_coordination",
+            "alignment_note": (
+                f"оси сопоставлены ИИ (координация): {len(hint.pairs)} пар, "
+                "смещение посчитано движком"
+            ),
+        }
+    )
+
+
+def _confident_by_labels(result: CadBuilding3dFloorRead, reference: BuiltFloor) -> bool:
+    """Совмещение по подписям уверенное: этаж совмещён по осям, а в каждом направлении либо не
+    меньше `CONFIDENT_LABELS` согласных подписей, либо одна, но габариты совмещённого этажа
+    перекрывают эталон не меньше чем на `SINGLE_AXIS_MIN_OVERLAP` (то же условие, что принимает
+    единственную марку в `_align_by_labels`). Откат на центр (`alignment = none`) - нет."""
+    if result.alignment != "axes":
+        return False
+    counts = (
+        sum(1 for axis in result.alignment_axes if axis.endswith(f"({LABEL_DIRECTION_VERTICAL})")),
+        sum(
+            1 for axis in result.alignment_axes if axis.endswith(f"({LABEL_DIRECTION_HORIZONTAL})")
+        ),
+    )
+    if min(counts) >= CONFIDENT_LABELS:
+        return True
+    if min(counts) < 1 or result.bbox is None or reference.floor.bbox is None:
+        return False
+    return _overlap_share(result.bbox, reference.floor.bbox) >= SINGLE_AXIS_MIN_OVERLAP
+
+
 def _align_to(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead:
+    """Совмещение этажа с эталоном: по подписям осей, а координация ИИ - только если подписи не
+    дали уверенного совмещения.
+
+    Уверенное совмещение по подписям ИИ не перебивает: смещение ИИ в допуске осей - подтверждение
+    (`alignment_note`), иначе остаётся совмещение по подписям с предупреждением. Если сохранённая
+    координация пары не применена (оси изменились), причина попадает в `alignment_note`.
+    """
+    result = _align_by_labels(item, reference)
+    hint = _coordination_for(item, reference)
+    if hint is None:
+        note = dict(item.coordination_notes).get(view_key_of(reference.floor))
+        return result if note is None else result.model_copy(update={"alignment_note": note})
+    if not _confident_by_labels(result, reference):
+        return _align_by_coordination(item, reference, hint)
+    ox, oy = item.floor.offset_mm
+    shift_x, shift_y = result.offset_mm[0] - ox, result.offset_mm[1] - oy
+    diff_x, diff_y = hint.offset_mm[0] - shift_x, hint.offset_mm[1] - shift_y
+    turned = result.rotation_deg != item.floor.rotation_deg
+    if not turned and abs(diff_x) <= AXIS_TOLERANCE_MM and abs(diff_y) <= AXIS_TOLERANCE_MM:
+        return result.model_copy(update={"alignment_note": "подтверждено ИИ (координация)"})
+    spread = (
+        "лист повёрнут относительно эталона"
+        if turned
+        else f"расхождение {diff_x:+.0f}/{diff_y:+.0f} мм"
+    )
+    return result.model_copy(
+        update={
+            "alignment_note": (
+                f"ИИ (координация) сопоставил оси иначе: {spread} - проверить; "
+                "оставлено совмещение по подписям"
+            )
+        }
+    )
+
+
+def _align_by_labels(item: BuiltFloor, reference: BuiltFloor) -> CadBuilding3dFloorRead:
     """Совмещение этажа с эталоном: сдвиг по осям, а у повёрнутого на 90, 180 или 270 градусов
     листа - сначала поворот вокруг начала кадра (`rotation_deg`), потом сдвиг:
     `p_эталона = R(rotation_deg) · p_вида + offset_mm`."""
@@ -3199,6 +3458,8 @@ class _SheetFloor:
     # и типовые этажи даёт паспорт листа и схемы КР (`cad_project_levels`).
     title_floors: tuple[str, ...] = ()
     title_marked: bool = False
+    # Оси с идентификаторами для координации ИИ (по кадру вида; нет кадра - пусто).
+    coord_axes: tuple[CoordAxis, ...] = ()
 
 
 # Ключ - всё, от чего зависит этаж листа: адрес и подпись листа, ключи артефактов (неизменны в
@@ -3331,9 +3592,11 @@ def _sheet_floor(
     # Оси сводного листа не связывают здания: планы секций на нём разложены не как на объекте.
     summary = is_summary_sheet(sheet.stamp_title)
     axes = NO_AXES if frame is None or summary else axes_in_mm(raw, frame)
+    coord_axes = () if frame is None or summary else tuple(coordination_axes(raw, frame))
     corps_of_sheet = (title.corps if title is not None else None) or sheet.passport_building
     if foreign_axes(axes, corps_of_sheet):
         axes = FloorAxes({}, {}, MESSAGE_AXES_FOREIGN)
+        coord_axes = ()
     cores = core_rings(document)
     windows = (
         window_source(
@@ -3365,6 +3628,7 @@ def _sheet_floor(
         windows=windows,
         title_floors=tuple(title.floors) if title is not None else (),
         title_marked=title is not None and bool(title.marks_mm),
+        coord_axes=coord_axes,
     )
 
 

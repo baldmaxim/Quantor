@@ -104,6 +104,27 @@ describe('3D-вид: общий выбор конструкций', () => {
     expect(dialog).not.toHaveTextContent('0');
   });
 
+  it('плашка плиты из двух частей: площадь и объём - сумма частей slab и slab-2', async () => {
+    const slab = construction({ id: 'slab', kind: 'floor_slab' });
+    const part = (id: string, area: number, volume: number) => ({
+      ...slab,
+      id,
+      computed: { ...slab.computed, area_m2: area, thickness_mm: 200, volume_m3: volume },
+    });
+    vi.mocked(client.readCadConstructions).mockImplementation(
+      () =>
+        ok({
+          ...constructionsRead(),
+          constructions: [part('slab', 50, 10), part('slab-2', 8.5, 1.7)],
+        }) as never,
+    );
+    mount({ onSelectConstruction: vi.fn(), selectedIds: new Set(['slab']) });
+    fireEvent.click(await button('плита'));
+    const dialog = await screen.findByRole('dialog', { name: 'Плита перекрытия' });
+    await vi.waitFor(() => expect(dialog).toHaveTextContent('58,5 м²'));
+    expect(dialog).toHaveTextContent('11,7 м³');
+  });
+
   it('плашка плиты: площадь, толщина и объём из конструкции slab', async () => {
     const slab = construction({ id: 'slab', kind: 'floor_slab' });
     vi.mocked(client.readCadConstructions).mockImplementation(

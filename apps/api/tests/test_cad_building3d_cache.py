@@ -7,6 +7,7 @@ import json
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.contracts.cad_building3d import CadBuilding3dRead
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
+from app.services import (
+    cad_axis_coordination_jobs,
+    cad_building3d_grid,
+    cad_project_levels,
+    cad_site_pins,
+)
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
-from app.services import cad_building3d_grid, cad_project_levels, cad_site_pins
 from app.services.cad_constructions import ProjectSlab
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_floor3d import NO_LEVELS, raw_document, raw_extras
@@ -90,6 +96,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef]) -> None:
     # Ручные привязки корпусов (ADR-0052) читаются из базы: в этом тесте базы нет.
     monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", _no_levels)
+    monkeypatch.setattr(cad_axis_coordination_jobs, "load_hints", AsyncMock(return_value={}))
     monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
 
 

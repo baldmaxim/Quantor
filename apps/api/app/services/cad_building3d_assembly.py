@@ -49,8 +49,8 @@ from app.core.logging import get_logger
 from app.domain import JobStatus, JobType
 from app.models import Job, SheetPassport
 from app.services import cad as cad_service
-from app.services import cad_building3d as b3d
 from app.services import (
+    cad_axis_coordination_jobs,
     cad_building3d_grid,
     cad_facade_windows,
     cad_project_levels,
@@ -59,6 +59,7 @@ from app.services import (
     cad_views,
     sheet_passports,
 )
+from app.services import cad_building3d as b3d
 from app.services import cad_building3d_windows as b3d_windows
 from app.services.cad_floor_title import floors_text, format_floor_title
 from app.services.cad_site_pins_math import SitePin
@@ -993,6 +994,10 @@ async def build_building3d(
         loaded, window_results, views_failed = await _with_windows(
             session, workspace_id=workspace_id, project_id=project_id, loaded=loaded
         )
+    # Смещения из координации ИИ - один запрос на сборку, по заданию конструкций цели.
+    hints = await cad_axis_coordination_jobs.load_hints(
+        session, workspace_id=workspace_id, project_id=project_id
+    )
     built: list[b3d.BuiltFloor] = []
     sources: list[tuple[b3d.SheetRef, tuple[CadBuilding3dWarningRead, ...]]] = []
     built_windows: list[b3d_windows.FloorWindows | None] = []
@@ -1014,10 +1019,13 @@ async def build_building3d(
                 None
                 if reference is None
                 else cad_building3d_grid.floor_fit(item.axes, reference.axes),
+                item.coord_axes,
             )
         )
         sources.append((sheet, item.warnings))
         built_windows.append(window_results[position] if window_results else None)
+    # Сохранённые пары координации ИИ - к текущим осям, смещение пересчитывает код.
+    built = cad_axis_coordination_jobs.apply_hints(built, hints)
     # Совмещение, дубли и постановка по ядрам - чистый расчёт на тысячах точек: в потоке.
     pins = await cad_site_pins.active_site_pins(session, project_id=project_id)
     grid_version = reference.number if reference is not None and reference.axes else None

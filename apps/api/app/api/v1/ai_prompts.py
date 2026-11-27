@@ -51,7 +51,8 @@ def _read(row: AiPromptVersion) -> AiPromptRead:
 async def list_ai_prompts(
     session: SessionDep,
     role: Annotated[
-        AiPromptRole | None, Query(description="Роль: corrector, verifier, vor_mapper или style")
+        AiPromptRole | None,
+        Query(description="Роль: corrector, verifier, vor_mapper, style или coordination"),
     ] = None,
 ) -> list[AiPromptSummary]:
     return [_summary(row) for row in await service.list_versions(session, role)]

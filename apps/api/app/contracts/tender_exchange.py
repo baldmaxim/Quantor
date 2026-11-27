@@ -15,7 +15,15 @@ from datetime import datetime
 from typing import Annotated, Any, Final, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    StringConstraints,
+    model_serializer,
+    model_validator,
+)
 
 # --------------------------------------------------------------------------- общее
 
@@ -232,6 +240,22 @@ class ObjectBaseOpening(_Strict):
 
 class ObjectBaseSlab(_Strict):
     shell: Ring
+    parts: list[Ring] | None = Field(
+        default=None,
+        description=(
+            "Все части плиты, включая основную (`shell`); есть только когда частей больше одной "
+            "(лист из двух корпусов), иначе поля нет. `shell` - самая большая часть."
+        ),
+    )
+
+    @model_serializer(mode="wrap")
+    def _drop_empty_parts(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """У односоставной плиты ключа `parts` в файле нет: ни null, ни [] (поле аддитивное)."""
+        data: dict[str, Any] = handler(self)
+        parts = data.get("parts")
+        if not parts or len(parts) < 2:
+            data.pop("parts", None)
+        return data
 
 
 class ObjectBaseConstructions(_Strict):

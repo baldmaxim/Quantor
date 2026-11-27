@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.models.mixins import CreatedAtMixin, uuid_pk
 
-AI_PROMPT_ROLES: tuple[str, ...] = ("corrector", "verifier", "vor_mapper", "style")
+AI_PROMPT_ROLES: tuple[str, ...] = ("corrector", "verifier", "vor_mapper", "style", "coordination")
 AI_PROMPT_STATUSES: tuple[str, ...] = ("draft", "active", "archived")
 # Предел текста промта в байтах UTF-8.
 AI_PROMPT_MAX_BYTES = 64 * 1024
@@ -54,7 +54,8 @@ class AiPromptVersion(CreatedAtMixin, Base):
             postgresql_where=sql_text("status = 'active'"),
         ),
         CheckConstraint(
-            "role in ('corrector', 'verifier', 'vor_mapper', 'style')", name="role_valid"
+            "role in ('corrector', 'verifier', 'vor_mapper', 'style', 'coordination')",
+            name="role_valid",
         ),
         CheckConstraint("status in ('draft', 'active', 'archived')", name="status_valid"),
         CheckConstraint("version >= 1", name="version_positive"),

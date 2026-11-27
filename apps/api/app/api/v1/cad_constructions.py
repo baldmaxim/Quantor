@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import uuid
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Any, Final
 
@@ -230,26 +230,39 @@ async def _load_props(session: SessionDep, sheet: _Sheet, walls: _Walls) -> stor
         page_index=sheet.page_index,
         view=sheet.view,
         current=[*walls.document.constructions, *walls.document.frame_partitions],
-        has_slab=walls.extras.slab is not None,
+        slab_ids=cad_constructions.slab_ids(walls.extras.slab),
         older=walls.older,
     )
 
 
-async def _slab(
+async def _slabs(
     session: SessionDep, sheet: _Sheet, walls: _Walls
-) -> cad_constructions.SlabInput | None:
-    """Плита листа с отверстиями, включёнными решениями человека (как в 3D); нет плиты — None."""
+) -> list[cad_constructions.SlabInput]:
+    """Части плиты листа с отверстиями, включёнными решениями человека (как в 3D); нет — []."""
     decisions = await floor3d_store.load_hole_decisions(
         session, revision_id=sheet.revision_id, page_index=sheet.page_index, view=sheet.view
     )
-    return cad_slab.slab_input(walls.extras, decisions)
+    return cad_slab.slab_inputs(walls.extras, decisions)
+
+
+def _stored_entry(props: Mapping[str, store.PropsEntry], key: str) -> store.PropsEntry | None:
+    """Запись параметров конструкции; у части плиты `slab-N` без своей записи — параметры `slab`.
+
+    Так же расчёт листа берёт параметры дополнительной части плиты: правка частью не должна
+    начинаться с пустых параметров и молча обрывать наследование. Принятие не наследуется:
+    у унаследованной записи оно сброшено, каждую часть принимает человек отдельно.
+    """
+    entry = props.get(key)
+    if entry is None and key.startswith(f"{cad_constructions.SLAB_ID}-"):
+        main = props.get(cad_constructions.SLAB_ID)
+        return (main[0], False) if main else None
+    return entry
 
 
 def _known_keys(walls: _Walls) -> set[str]:
-    """Адреса конструкций листа: стены, перегородки и плита, если она есть в файле."""
+    """Адреса конструкций листа: стены, перегородки и части плиты, если плита есть в файле."""
     known = {c.id for c in (*walls.document.constructions, *walls.document.frame_partitions)}
-    if walls.extras.slab is not None:
-        known.add(cad_constructions.SLAB_ID)
+    known.update(cad_constructions.slab_ids(walls.extras.slab))
     return known
 
 
@@ -305,7 +318,7 @@ async def facade_window_heights(
         loaded=loaded,
         openings=openings,
         extras=walls.extras.openings,
-        slab_shell=None if slab is None else slab.shell,
+        slab_rings=None if slab is None else slab.rings,
         axes=axes,
         corps=None if title is None else title.corps,
         section=None if title is None else title.section,
@@ -372,7 +385,7 @@ async def _totals(
         loaded = dataclasses.replace(loaded, props=props_now)
     # Толщина плиты проекта из разреза (ADR-0039) сильнее walls.json, слабее переопределения листа.
     project_slab = await store.load_project_slab(session, project_id=sheet.project_id)
-    slab = await _slab(session, sheet, walls)
+    slabs = await _slabs(session, sheet, walls)
     # Высота маячного ряда внутриквартирных перегородок и зоны квартир листа.
     partition = await cad_partitions.load_partition_context(
         session,
@@ -388,7 +401,7 @@ async def _totals(
     # Высоты окон по видам фасадов: в объём - только с принятым видом (считает compute_sheet).
     facades = await facade_window_heights(session, storage, sheet, walls, levels, project_slab)
     result = await _compute(
-        lift.document, loaded, levels, project_slab, slab, partition, facades.heights
+        lift.document, loaded, levels, project_slab, slabs, partition, facades.heights
     )
     extra = [*lift.warnings, *cad_facade_windows.grouped_warnings(facades.issues)]
     if extra:
@@ -403,7 +416,7 @@ async def _compute(
     loaded: store.PropsLoad,
     levels: CadSheetLevelsRead,
     project_slab: cad_constructions.ProjectSlab | None,
-    slab: cad_constructions.SlabInput | None,
+    slabs: Sequence[cad_constructions.SlabInput],
     partition: cad_constructions.PartitionContext | None,
     window_heights: Mapping[str, cad_facade_windows.FacadeWindowHeight] | None = None,
 ) -> cad_constructions.SheetResult:
@@ -414,7 +427,7 @@ async def _compute(
         loaded.props,
         levels,
         project_slab,
-        slab,
+        slabs,
         partition,
         window_heights,
     )
@@ -534,7 +547,7 @@ async def bulk_cad_construction_props(
     current = loaded.props
     updates: dict[str, store.PropsEntry] = {}
     for key in keys:
-        old_props, old_accepted = current.get(key, (CadConstructionProps(), False))
+        old_props, old_accepted = _stored_entry(current, key) or (CadConstructionProps(), False)
         new_props = store.merge_props(old_props, body.props_patch)
         new_accepted = old_accepted if body.accepted is None else body.accepted
         if new_props != old_props or new_accepted != old_accepted:
@@ -578,7 +591,7 @@ async def put_cad_construction_props(
     if construction_key not in _known_keys(walls):
         raise not_found("Конструкция")
     loaded = await _load_props(session, sheet, walls)
-    existing = loaded.props.get(construction_key)
+    existing = _stored_entry(loaded.props, construction_key)
     accepted = body.accepted if body.accepted is not None else (existing[1] if existing else False)
     await store.save_props(
         session,

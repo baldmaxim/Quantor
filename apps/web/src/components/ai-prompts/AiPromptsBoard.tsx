@@ -34,6 +34,9 @@ import { AiPromptStatsTable } from './AiPromptStatsTable';
 const ROLES: readonly { value: AiPromptRole; label: string }[] = [
   { value: 'corrector', label: AI_PROMPT_ROLE_LABEL.corrector },
   { value: 'verifier', label: AI_PROMPT_ROLE_LABEL.verifier },
+  { value: 'vor_mapper', label: AI_PROMPT_ROLE_LABEL.vor_mapper },
+  { value: 'style', label: AI_PROMPT_ROLE_LABEL.style },
+  { value: 'coordination', label: AI_PROMPT_ROLE_LABEL.coordination },
 ];
 
 const STATUS: Readonly<

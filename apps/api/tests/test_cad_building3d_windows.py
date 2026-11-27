@@ -10,6 +10,7 @@ import json
 import uuid
 from collections.abc import Iterator, Sequence
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,9 +19,14 @@ from app.contracts.cad import CadFrameRead
 from app.contracts.cad_building3d import CadBuilding3dFloorRead, CadBuilding3dRead
 from app.contracts.cad_constructions import CadSheetLevelsRead, WallsDocument
 from app.contracts.cad_floor3d import WallsFloorExtras
+from app.services import (
+    cad_axis_coordination_jobs,
+    cad_building3d_grid,
+    cad_project_levels,
+    cad_site_pins,
+)
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
-from app.services import cad_building3d_grid, cad_project_levels, cad_site_pins
 from app.services import cad_building3d_windows as windows
 from app.services import cad_facade_windows as fw
 from app.services.cad_constructions import ProjectSlab
@@ -185,6 +191,27 @@ def test_candidate_facade_view_gives_a_pale_candidate_window() -> None:
     assert (window.glass_z_bottom_mm, window.glass_z_top_mm) == (BASE + 900, BASE + 2400)
 
 
+def test_window_on_a_non_main_slab_part_gets_the_facade_height() -> None:
+    # Основная (большая) часть плиты правее окна; окно на южной стене малой части (лист из двух
+    # корпусов): по одному `slab.shell` окно «не наружное», по всем частям - берёт высоту фасада.
+    raw = _raw(axes=True)
+    main = [[8000.0, 0.0], [14000.0, 0.0], [14000.0, 4000.0], [8000.0, 4000.0]]
+    small = [[2500.0, 0.0], [5000.0, 0.0], [5000.0, 4000.0], [2500.0, 4000.0]]
+    raw["slab"] = {
+        "shell": main,
+        "area_mm2": 34_000_000.0,
+        "parts": [
+            {"shell": main, "area_mm2": 24_000_000.0},
+            {"shell": small, "area_mm2": 10_000_000.0},
+        ],
+    }
+    item = _built(raw, NO_LEVELS, FRAME)
+    assert item.windows is not None and item.windows.slab_rings == [main, small]
+    (window,) = _floor_windows(item, [view([FACADE_OK])]).windows
+    assert window.accepted is True and window.source == "facade"
+    assert (window.glass_z_bottom_mm, window.glass_z_top_mm) == (BASE + 900, BASE + 2400)
+
+
 def test_accepted_facade_view_gives_an_accepted_window() -> None:
     item = _facade_item(FRAME)
     (window,) = _floor_windows(item, [view([FACADE_OK])]).windows
@@ -293,6 +320,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, sheets: list[b3d.SheetRef], loads: l
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
     monkeypatch.setattr(cad_site_pins, "active_site_pins", no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", no_levels)
+    monkeypatch.setattr(cad_axis_coordination_jobs, "load_hints", AsyncMock(return_value={}))
     monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     monkeypatch.setattr(fw, "load_views", load_views)
 

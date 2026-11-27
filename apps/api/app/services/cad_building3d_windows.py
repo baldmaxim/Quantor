@@ -83,7 +83,7 @@ def floor_windows(
         loaded=loaded,
         openings=source.openings,
         extras=source.extras,
-        slab_shell=source.slab_shell,
+        slab_rings=source.slab_rings,
         axes=_axes_of(source) if loaded.views else None,
         corps=source.corps,
         section=source.section,

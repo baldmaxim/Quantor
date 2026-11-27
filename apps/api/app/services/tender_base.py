@@ -486,7 +486,8 @@ def build_constructions(
         )
     slab: ObjectBaseSlab | None = None
     if extras.slab is not None and len(shell := _ring(extras.slab.shell)) >= 3:
-        slab = ObjectBaseSlab(shell=shell)
+        parts = [ring for part in extras.slab.rings if len(ring := _ring(part)) >= 3]
+        slab = ObjectBaseSlab(shell=shell, parts=parts if len(parts) > 1 else None)
     return ObjectBaseConstructions(
         schema_name="quantor.object_base.constructions.v1",
         constructions=constructions,

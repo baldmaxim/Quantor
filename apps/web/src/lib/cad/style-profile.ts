@@ -76,6 +76,18 @@ const areaClass = z.object({
   area_m2: z.number().nullable().optional(),
 });
 
+const hatchSignature = z.object({
+  color: z.array(z.number()),
+  pen: z.number(),
+  angle_deg: z.number(),
+  pitch_pt: z.number(),
+});
+
+const monolithClass = areaClass.extend({
+  hatch_signatures: z.array(hatchSignature).optional(),
+  hatch_segments: count.optional(),
+});
+
 const sampleRecord = z
   .object({ index: z.number().optional(), class: z.string() })
   .passthrough();
@@ -83,7 +95,7 @@ const sampleRecord = z
 export const stylePreviewSchema = z.object({
   classes: z
     .object({
-      monolith: areaClass,
+      monolith: monolithClass,
       shaft: areaClass,
       masonry: z.object({ grays, hatch_segments: count }),
       door: z.object({ pen_max_width: z.number(), candidates_not_doors: count }),
@@ -92,10 +104,14 @@ export const stylePreviewSchema = z.object({
   field_sources: z.record(z.string(), z.string()).nullable(),
   unclassified_fill_share: z.number().min(0).max(1).nullable(),
   rejected_samples: z.array(z.object({ sample: sampleRecord, reason: z.string() }).passthrough()),
+  outline_only_samples: z
+    .array(z.object({ sample: sampleRecord, reason: z.string(), area_pt2: z.number() }).passthrough())
+    .optional(),
   unsupported_samples: z.array(sampleRecord.extend({ reason: z.string() }).passthrough()),
   warnings: z.array(z.object({ code: z.string(), message: z.string() }).passthrough()),
 });
 
+export type StyleHatchSignature = z.infer<typeof hatchSignature>;
 export type StylePreview = z.infer<typeof stylePreviewSchema>;
 
 /** Разобрать `preview` результата; не по контракту - `null` (панель скажет, что разбора нет). */
@@ -112,6 +128,7 @@ const REJECT_REASONS: Readonly<Record<string, string>> = {
   no_hatch_at_point: 'в точке нет штриховки',
   color_hatch_unsupported: 'цветная штриховка: движок снимает только серую',
   no_arc_at_point: 'в точке нет дуги двери',
+  no_fill_or_hatch_at_point: 'Ни заливки, ни штриховки в точке',
 };
 
 export const rejectReasonText = (reason: string): string => REJECT_REASONS[reason] ?? reason;
@@ -142,7 +159,22 @@ export const STATUS_TEXT: Readonly<Record<CadStylePreviewResult['result_status']
 };
 
 export const NO_SIGNATURE_HINT =
-  'Ни один щелчок не дал признака — щёлкайте внутри заливок и по штриховке.';
+  'Ни один щелчок не дал признака. Монолит — внутри заливки или по штриховке стены, шахту — внутри заливки, кладку — по штриховке, дверь — по дуге или внутри сектора открывания.';
+
+/** Цвет подписи штриховки (доли 0..1) в CSS `rgb()`; вне диапазона зажимается. */
+export const hatchColorCss = (color: readonly number[]): string => {
+  const [red = 0, green = 0, blue = 0] = color.map((part) =>
+    Math.round(Math.min(1, Math.max(0, part)) * 255),
+  );
+  return `rgb(${red}, ${green}, ${blue})`;
+};
+
+const decimal = (value: number): string =>
+  value.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+
+/** Подпись штриховки текстом: угол, шаг и перо в pt. */
+export const hatchSignatureText = (item: StyleHatchSignature): string =>
+  `угол ${decimal(item.angle_deg)}°, шаг ${decimal(item.pitch_pt)} pt, перо ${decimal(item.pen)} pt`;
 
 /** Откуда профиль: из `source.kind` версии. */
 export const profileSourceText = (source: Readonly<Record<string, unknown>>): string => {

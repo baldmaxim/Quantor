@@ -181,6 +181,7 @@ async def test_two_packs_to_existing_project(
     assert body["summary"] == {
         "total": 2,
         "pending": 2,
+        "uploading": 0,
         "received": 0,
         "imported": 0,
         "failed": 0,
@@ -348,6 +349,91 @@ async def test_lost_response_and_parallel_upload_make_one_revision(
     )
     assert packages == 1
     assert (await db_session.scalar(select(func.count()).select_from(Job))) == 1
+
+
+async def test_item_under_upload_is_uploading_and_start_status_do_not_wait(
+    db_engine: AsyncEngine, db_session: AsyncSession, fake_storage: FakeObjectStorage
+) -> None:
+    factory = async_sessionmaker(db_engine, expire_on_commit=False, autoflush=False)
+    async with _parallel_api(db_engine, db_session, fake_storage) as api:
+        project_id = await _project(api)
+        pack = make_pack("a", variant="A")
+        first = (await _start(api, project_id, [pack])).json()
+        import_id = first["import_id"]
+        item_id = await db_session.scalar(
+            select(TenderImportItem.id).where(TenderImportItem.import_id == uuid.UUID(import_id))
+        )
+        assert item_id is not None
+
+        # Отдельная сессия держит строку позиции, как `lock_item` во время приёма ZIP.
+        async with factory() as locker:
+            await locker.execute(
+                select(TenderImportItem.id).where(TenderImportItem.id == item_id).with_for_update()
+            )
+            changed = pack.rebuilt().item(filename="changed.zip")
+            assert changed["sha256"] != pack.item()["sha256"]
+
+            repeat = await asyncio.wait_for(
+                api.post(START, json={"project_id": project_id, "items": [changed]}), timeout=5
+            )
+            status = await asyncio.wait_for(api.get(f"{START}/{import_id}"), timeout=5)
+
+            for response in (repeat, status):
+                assert response.status_code == 200, response.text
+                body = response.json()
+                assert _states(body) == {"a": "uploading"}
+                assert body["to_upload"] == [] and body["complete"] is False
+                assert body["summary"]["uploading"] == 1 and body["summary"]["pending"] == 0
+                stored = body["items"][0]
+                assert stored["filename"] == pack.filename
+                assert stored["sha256"] == pack.item()["sha256"]
+            await locker.rollback()
+
+        # Загрузка закончилась ничем: позиция снова ждёт файла, запись не переписана.
+        after = await _status(api, import_id)
+        assert _states(after) == {"a": "pending"}
+        assert after["to_upload"] == ["a"] and after["summary"]["uploading"] == 0
+        assert after["items"][0]["filename"] == pack.filename
+
+    async with factory() as reader:
+        filename = await reader.scalar(
+            select(TenderImportItem.filename).where(TenderImportItem.id == item_id)
+        )
+    assert filename == pack.filename
+
+
+async def test_concurrent_status_read_does_not_block_start_or_mark_uploading(
+    db_engine: AsyncEngine, db_session: AsyncSession, fake_storage: FakeObjectStorage
+) -> None:
+    factory = async_sessionmaker(db_engine, expire_on_commit=False, autoflush=False)
+    async with _parallel_api(db_engine, db_session, fake_storage) as api:
+        project_id = await _project(api)
+        pack = make_pack("a", variant="A")
+        import_id = (await _start(api, project_id, [pack])).json()["import_id"]
+        item_id = await db_session.scalar(
+            select(TenderImportItem.id).where(TenderImportItem.import_id == uuid.UUID(import_id))
+        )
+        assert item_id is not None
+
+        # Параллельный запрос статуса держит строку позиции FOR KEY SHARE.
+        async with factory() as reader:
+            await reader.execute(
+                select(TenderImportItem.id)
+                .where(TenderImportItem.id == item_id)
+                .with_for_update(read=True, key_share=True)
+            )
+            changed = pack.rebuilt().item(filename="changed.zip")
+            repeat = await asyncio.wait_for(
+                api.post(START, json={"project_id": project_id, "items": [changed]}), timeout=5
+            )
+            await reader.rollback()
+
+    assert repeat.status_code == 200, repeat.text
+    body = repeat.json()
+    assert _states(body) == {"a": "pending"} and body["to_upload"] == ["a"]
+    assert body["summary"]["uploading"] == 0
+    stored = body["items"][0]
+    assert stored["filename"] == "changed.zip" and stored["sha256"] == changed["sha256"]
 
 
 # ------------------------------------------------------------------------------- проверка передачи
@@ -592,7 +678,8 @@ async def test_retryable_failure_is_resent_with_same_bytes_and_requeued(
     failed = await _status(api, import_id)
     assert _states(failed) == {"a": "failed"}
     assert failed["items"][0]["error_code"] == code
-    assert failed["to_upload"] == ["a"] and failed["complete"] is True
+    # Повторяемый отказ: позицию надо дослать, поэтому импорт не завершён.
+    assert failed["to_upload"] == ["a"] and failed["complete"] is False
 
     # Те же байты: дубль по хешу, упавшее задание возвращается в очередь.
     again = await _send(api, project_id, import_id, pack)
@@ -619,8 +706,8 @@ async def test_retryable_failure_is_resent_with_same_bytes_and_requeued(
     assert imports == 1
 
 
-async def test_cancelled_job_is_resent_with_rebuilt_zip_as_new_package(
-    api: AsyncClient, db_session: AsyncSession, fake_storage: FakeObjectStorage
+async def test_cancelled_job_is_not_resent_and_import_is_complete(
+    api: AsyncClient, db_session: AsyncSession
 ) -> None:
     project_id = await _project(api)
     pack = make_pack("a", variant="A")
@@ -628,42 +715,47 @@ async def test_cancelled_job_is_resent_with_rebuilt_zip_as_new_package(
     import_id = body["import_id"]
     first = await _send(api, project_id, import_id, pack)
     assert first.status_code == 201, first.text
-    old_revision_id = first.json()["revision"]["id"]
 
     job = await _item_job(db_session, await _status(api, import_id), "a")
     await jobs_service.cancel(db_session, job=job)
     await db_session.commit()
 
+    # Отменённое задание в очередь не вернётся: ключа нет в to_upload, ждать нечего.
     cancelled = await _status(api, import_id)
     assert _states(cancelled) == {"a": "failed"}
     assert cancelled["items"][0]["job_status"] == "cancelled"
-    assert cancelled["to_upload"] == ["a"]
+    assert cancelled["to_upload"] == []
+    assert cancelled["complete"] is True and cancelled["summary"]["failed"] == 1
 
-    # Тот же комплект, ZIP собран заново (другие метки времени): повторный start тем же
-    # перечнем обновляет хеш и размер позиции в том же импорте.
-    rebuilt = pack.rebuilt()
-    assert rebuilt.data != pack.data
-    restarted = await _start(api, project_id, [rebuilt])
+    # Повторный start (пересобранный ZIP) тоже не просит слать позицию заново.
+    restarted = await _start(api, project_id, [pack.rebuilt()])
     assert restarted.status_code == 200, restarted.text
-    assert restarted.json()["import_id"] == import_id and restarted.json()["created"] is False
-    refreshed = restarted.json()["items"][0]
-    assert refreshed["sha256"] == rebuilt.item()["sha256"]
-    assert refreshed["size"] == rebuilt.item()["size"]
-    assert restarted.json()["to_upload"] == ["a"]
+    assert restarted.json()["to_upload"] == [] and restarted.json()["complete"] is True
 
-    sent = await _send(api, project_id, import_id, rebuilt)
-    assert sent.status_code == 201, sent.text
-    assert sent.json()["is_duplicate"] is False
-    assert sent.json()["revision"]["id"] != old_revision_id
-    assert sent.json()["job"]["id"] != str(job.id)
 
-    await _run_jobs(db_session, fake_storage)
+async def test_failed_retryable_keeps_import_incomplete_cancelled_does_not(
+    api: AsyncClient, db_session: AsyncSession
+) -> None:
+    project_id = await _project(api)
+    retry, dead = make_pack("retry", variant="R"), make_pack("dead", variant="D")
+    body = (await _start(api, project_id, [retry, dead])).json()
+    import_id = body["import_id"]
+    for pack in (retry, dead):
+        assert (await _send(api, project_id, import_id, pack)).status_code == 201
 
-    done = await _status(api, import_id)
-    assert _states(done) == {"a": "imported"} and done["to_upload"] == []
-    assert done["items"][0]["package_revision_id"] == sent.json()["revision"]["id"]
-    # Ожидаемо два документа-пакета: отменённый прежний и новый.
-    assert await _packages_count(db_session) == 2
+    status = await _status(api, import_id)
+    retry_job = await _item_job(db_session, status, "retry")
+    dead_job = await _item_job(db_session, status, "dead")
+    code = ErrorCode.STORAGE_UNAVAILABLE.value
+    await jobs_service.start(db_session, job=retry_job)
+    await jobs_service.fail(db_session, job=retry_job, error_code=code, error_message="сбой")
+    await jobs_service.cancel(db_session, job=dead_job)
+    await db_session.commit()
+
+    state = await _status(api, import_id)
+    assert _states(state) == {"retry": "failed", "dead": "failed"}
+    assert state["to_upload"] == ["retry"] and state["complete"] is False
+    assert state["summary"]["failed"] == 2
 
 
 # ------------------------------------------------------------------------------- изоляция
@@ -791,14 +883,14 @@ async def test_upload_token_works_on_existing_project_but_cannot_create(
     assert await _tenders_count(db_session) == 1
 
 
-async def test_upload_token_cannot_start_by_unknown_id_even_if_tender_number_exists(
+async def test_upload_token_finds_project_of_another_version_by_tender_number(
     db_session: AsyncSession,
     build_api: Callable[..., AsyncClient],
     fake_storage: FakeObjectStorage,
 ) -> None:
     await _approved_user(db_session, role=Role.ENGINEER)
-    # Объект с тем же номером тендера, но другим external_id.
-    await projects_service.create_project(
+    # Объект с тем же номером тендера, но другим external_id (другая версия тендера).
+    previous = await projects_service.create_project(
         db_session,
         workspace_id=DEV_WORKSPACE_ID,
         name="Прежняя версия",
@@ -810,10 +902,41 @@ async def test_upload_token_cannot_start_by_unknown_id_even_if_tender_number_exi
     token = await _token(build_api, ["upload"])
     calls: list[str] = []
     async with _token_client(db_session, fake_storage, token, hub=_hub(calls)) as client:
+        response = await client.post(START, json=_by_tender(make_pack("a")))
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["project_id"] == str(previous.id)
+        assert body["matched_by"] == "tender_number"
+    # Номер тендера взят из TenderHUB, новый объект не создан.
+    assert len(calls) == 1
+    assert await _tenders_count(db_session) == 1
+    assert (await db_session.scalar(select(func.count()).select_from(TenderImport))) == 1
+
+
+async def test_upload_token_without_matching_project_cannot_create(
+    db_session: AsyncSession,
+    build_api: Callable[..., AsyncClient],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    await _approved_user(db_session, role=Role.ENGINEER)
+    # Объект другого тендера: номер не совпадает.
+    await projects_service.create_project(
+        db_session,
+        workspace_id=DEV_WORKSPACE_ID,
+        name="Другой тендер",
+        source=ProjectSource.TENDERHUB,
+        external_id="tender-0099",
+        external_ref="ТН-0099",
+    )
+    await db_session.commit()
+    token = await _token(build_api, ["upload"])
+    calls: list[str] = []
+    async with _token_client(db_session, fake_storage, token, hub=_hub(calls)) as client:
         denied = await client.post(START, json=_by_tender(make_pack("a")))
         assert denied.status_code == 403
         assert denied.json()["detail"]["code"] == CREATE_FORBIDDEN
-    assert calls == []
+    # TenderHUB опрошен (номер нужен для поиска), но объект не создан и импорта нет.
+    assert len(calls) == 1
     assert await _tenders_count(db_session) == 1
     assert (await db_session.scalar(select(func.count()).select_from(TenderImport))) == 0
 
@@ -877,6 +1000,14 @@ async def test_unknown_tender_and_disabled_integration(
         off = await client.post(START, json=_by_tender(pack))
         assert off.status_code == 503
         assert off.json()["detail"]["code"] == ErrorCode.TENDERHUB_DISABLED.value
+    assert await _tenders_count(db_session) == 0
+
+    # Без области tender_import и без TenderHUB объект найти нельзя, а создавать его нельзя.
+    upload_only = await _token(build_api, ["upload"])
+    async with _token_client(db_session, fake_storage, upload_only, hub=None) as client:
+        denied = await client.post(START, json=_by_tender(pack))
+        assert denied.status_code == 403
+        assert denied.json()["detail"]["code"] == CREATE_FORBIDDEN
     assert await _tenders_count(db_session) == 0
 
 

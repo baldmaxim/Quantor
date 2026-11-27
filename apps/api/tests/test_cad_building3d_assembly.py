@@ -6,6 +6,7 @@ import dataclasses
 import json
 import uuid
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +15,14 @@ from app.contracts.cad_building3d import CadBuilding3dGroupRead, CadBuilding3dPl
 from app.contracts.cad_constructions import WallsDocument
 from app.domain import JobStatus, JobType
 from app.models import Job
+from app.services import (
+    cad_axis_coordination_jobs,
+    cad_building3d_grid,
+    cad_project_levels,
+    cad_site_pins,
+)
 from app.services import cad_building3d as b3d
 from app.services import cad_building3d_assembly as assembly
-from app.services import cad_building3d_grid, cad_project_levels, cad_site_pins
 from tests.conftest import FakeObjectStorage
 from tests.test_cad_building3d import axes_block, built, sheet, with_cores
 from tests.test_cad_floor3d import BASE, heights, raw_document, raw_extras
@@ -510,6 +516,7 @@ async def test_response_lists_service_sheets_and_follows_the_stack_height(
     # Ручные привязки корпусов (ADR-0052) читаются из базы: в этом тесте базы нет.
     monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", _no_levels)
+    monkeypatch.setattr(cad_axis_coordination_jobs, "load_hints", AsyncMock(return_value={}))
     monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     body = await assembly.build_building3d(
         cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()
@@ -572,6 +579,7 @@ async def test_response_lists_unplaced_summary_sheet_as_service_sheet(
     monkeypatch.setattr(assembly, "collect_missing_plans", no_missing)
     monkeypatch.setattr(cad_site_pins, "active_site_pins", _no_pins)
     monkeypatch.setattr(cad_project_levels, "load_project_levels", _no_levels)
+    monkeypatch.setattr(cad_axis_coordination_jobs, "load_hints", AsyncMock(return_value={}))
     monkeypatch.setattr(cad_building3d_grid, "load_model_reference", _no_model)
     body = await assembly.build_building3d(
         cast(AsyncSession, object()), storage, workspace_id=uuid.uuid4(), project_id=uuid.uuid4()

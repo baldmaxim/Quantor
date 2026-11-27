@@ -48,6 +48,58 @@ _BBOX_PAD_PT = 6.0
 _ROLE_LABEL: dict[str, str] = {"corrector": "правщик", "verifier": "проверщик"}
 # Замечания пишет система, а не пользователь портала: автор - нулевой идентификатор.
 _SYSTEM_USER = uuid.UUID(int=0)
+_FAILURE_TAIL_LIMIT = 600
+_FAILURE_FIELDS = ("subtype", "is_error", "num_turns", "duration_ms", "result")
+# Дописывается к тексту активной версии промта: версия в БД не меняется.
+PACK_PROMPT_BLOCK = """
+
+== Состав пакета ==
+Файлы лежат в текущей папке; читай их инструментом Read.
+1. Сначала прочитай walls_summary.json целиком: сводка walls.json (масштаб, счётчики по слоям
+   и толщинам, список конструкций и проёмов с bbox_px, диагностика движка). Не читай walls.json
+   целиком: он большой; если нужны детали конкретного id, читай его частями.
+2. plan.png и overlay.png - общий вид; tiles/rRcC_pdf.png - тот же чертёж из PDF крупнее
+   (около 2,5 раза), tiles/rRcC_overlay.png - то же с наложением конструкций и проёмов.
+3. На тайлах нанесена сетка: подписи xNNN / yNNN - пиксели plan.png (система координат ответа),
+   под ними - миллиметры от начала вида. Снимай координаты рамок по подписям сетки.
+4. tiles.json - границы каждого тайла: bbox_px (в plan.png), bbox_pt, масштабы.
+5. Рамки в findings (bbox_px) давай в пикселях plan.png, не в пикселях тайла.
+6. Длины и площади бери из данных движка; сам их не вычисляй.
+7. Движок исполняет только узкие рамки: missing_wall - одна стена, длинная сторона рамки
+   не больше 6000 мм и площадь не больше 12 м2 (перевод в px - scale.mm_per_plan_px в
+   walls_summary.json), иначе рамка отвергается целиком; длинную стену дели на куски.
+   missing_door - одна дверь, рамка вокруг дуги открывания.
+8. Не объединяй однотипные ошибки в одну рамку на зону или весь план: каждая пропущенная
+   стена и дверь - отдельная находка (схема ограничивает только общее число).
+"""
+
+
+def failure_tail(output: bytes | str) -> str:
+    """Причина отказа Claude из stderr шлюза: одна JSON-строка с белым списком полей, ≤600 знаков.
+
+    Остальной вывод (ssh, трассировки, прочее) не показывается: в нём могут быть служебные данные.
+    """
+    text = output if isinstance(output, str) else output.decode("utf-8", errors="replace")
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            data = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(data, dict) or not set(data) & set(_FAILURE_FIELDS):
+            continue
+        parts = [f"{key}={data[key]}" for key in _FAILURE_FIELDS[:-1] if data.get(key) is not None]
+        result = " ".join(str(data.get("result") or "").split())
+        if result:
+            parts.append(f"result={result}")
+        return "; ".join(parts)[:_FAILURE_TAIL_LIMIT]
+    return ""
+
+
+def _with_tail(message: str, tail: str) -> str:
+    return f"{message}: {tail}" if tail else message
 
 
 def pilot_for(walls: Job, settings: Settings) -> AiLoopPilot | None:
@@ -378,7 +430,7 @@ async def _prepare(
     }
     job.payload = {**job.payload, **prompt_ref}
     # Текст дословно, без перекодирования: по этим байтам считается prompt_sha256.
-    (root / "prompt.txt").write_bytes(prompt.text.encode())
+    (root / "prompt.txt").write_bytes((prompt.text + PACK_PROMPT_BLOCK).encode())
     manifest = {
         **payload,
         **prompt_ref,
@@ -428,9 +480,15 @@ async def execute_ai_review(
         from app.cad_worker.ai_style import execute_ai_style  # цикл модулей
 
         return await execute_ai_style(session, job, storage, settings)
+    if job.payload.get("role") == ai_loop.COORDINATION_ROLE:
+        # Роль «координация»: пары осей этажа и эталона «Здания», свой пакет, схема и CLI.
+        from app.cad_worker.ai_coordination import execute_ai_coordination  # цикл модулей
+
+        return await execute_ai_coordination(session, job, storage, settings)
     owner, attempt = job.worker_id, job.attempt
     await jobs.start(session, job=job, stage="cad_ai_review")
     await session.commit()
+    tail = ""
     try:
         if not settings.cad_review_ssh_config or not settings.cad_engine_python:
             raise CadError(ErrorCode.CAD_ENGINE_UNAVAILABLE, "SSH для проверки не настроен")
@@ -460,7 +518,8 @@ async def execute_ai_review(
             )
             if outcome is None:
                 return job
-            code, _ = outcome
+            code, output = outcome
+            tail = failure_tail(output)
             if code == 124:
                 raise CadError(ErrorCode.JOB_TIMEOUT, "Claude не уложился во время проверки")
             if code == 255:
@@ -471,7 +530,11 @@ async def execute_ai_review(
                 log.warning("cad_ai_review_process_failed", job_id=str(job.id), exit_code=code)
                 raise CadError(
                     ErrorCode.CAD_ENGINE_FAILED,
-                    "Проверка завершилась с ошибкой при подготовке пакета или вызове Claude по SSH",
+                    _with_tail(
+                        "Проверка завершилась с ошибкой при подготовке пакета"
+                        " или вызове Claude по SSH",
+                        tail,
+                    ),
                 )
             with (root / "review.json").open("rb") as report_file:
                 raw_report = report_file.read(_MAX_REPORT_BYTES + 1)
@@ -517,7 +580,8 @@ async def execute_ai_review(
         # ValidationError - подкласс ValueError.
         log.warning("cad_ai_review_invalid", job_id=str(job.id), error=type(error).__name__)
         failure = CadError(
-            ErrorCode.CAD_ENGINE_FAILED, "Не удалось подготовить или прочитать отчёт"
+            ErrorCode.CAD_ENGINE_FAILED,
+            _with_tail("Не удалось подготовить или прочитать отчёт", tail),
         )
     except CadError as error:
         failure = error

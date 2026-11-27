@@ -42,8 +42,8 @@ def sheet_with_slab(
     doc = document([construction()])
     doc.heights.slab_thickness_mm = slab_thickness
     doc.heights.slab_status = "assumption" if slab_thickness is not None else "missing"
-    slab = cad_slab.slab_input(extras(), decisions or {})
-    return calc.compute_sheet(doc, props or {}, levels, None, slab)
+    slabs = cad_slab.slab_inputs(extras(), decisions or {})
+    return calc.compute_sheet(doc, props or {}, levels, None, slabs)
 
 
 def test_slab_input_takes_enabled_holes_and_ignores_unknown_fields() -> None:
@@ -51,19 +51,19 @@ def test_slab_input_takes_enabled_holes_and_ignores_unknown_fields() -> None:
     assert plain.slab is not None and with_id.slab is not None
     assert plain.slab.shell == with_id.slab.shell
     keys = hole_keys(plain)
-    slab = cad_slab.slab_input(with_id, {keys[1]: False})
-    assert slab is not None and slab.id == "slab"
+    (slab,) = cad_slab.slab_inputs(with_id, {keys[1]: False})
+    assert slab.id == "slab"
     assert [area for _shell, area in slab.holes] == [1_000_000.0]
     assert slab.net_area_mm2 == pytest.approx(23_000_000.0)
     # Явное «включено» ничем не отличается от отсутствия решения.
-    both = cad_slab.slab_input(plain, {keys[0]: True})
-    assert both is not None and len(both.holes) == 2
+    (both,) = cad_slab.slab_inputs(plain, {keys[0]: True})
+    assert len(both.holes) == 2
 
 
 def test_no_slab_in_file_gives_no_slab_input() -> None:
-    assert cad_slab.slab_input(extras(slab=False), {}) is None
+    assert cad_slab.slab_inputs(extras(slab=False), {}) == []
     old = WallsFloorExtras.model_validate({})
-    assert cad_slab.slab_input(old, {}) is None
+    assert cad_slab.slab_inputs(old, {}) == []
 
 
 def test_slab_is_last_with_net_area_and_volume() -> None:
@@ -164,3 +164,101 @@ def test_slab_group_is_covered_by_the_vor_report() -> None:
     slab_group = next(g for g in coverage.groups if g.kind == "floor_slab")
     assert slab_group.group_key == "floor_slab|200|" and slab_group.status == "not_in_vor"
     assert "slab" in coverage.not_in_vor_keys
+
+
+# ------------------------------------------------------------------ плита из двух частей (v1.27)
+
+PART_B = [[8000.0, 0.0], [11000.0, 0.0], [11000.0, 3000.0], [8000.0, 3000.0]]  # 9 м2
+H3 = [[9000.0, 1000.0], [9500.0, 1000.0], [9500.0, 1500.0], [9000.0, 1500.0]]  # в части B
+H_OUT = [[20000.0, 0.0], [21000.0, 0.0], [21000.0, 1000.0], [20000.0, 1000.0]]  # вне частей
+
+
+def two_part_extras(*, main_first: bool = True) -> WallsFloorExtras:
+    main = {"shell": SHELL, "area_mm2": 24_000_000.0}
+    other = {"shell": PART_B, "area_mm2": 9_000_000.0}
+    return WallsFloorExtras.model_validate(
+        {
+            "slab": {
+                "shell": SHELL,
+                "area_mm2": 33_000_000.0,
+                "parts": [main, other] if main_first else [other, main],
+            },
+            "slab_holes": [
+                {"id": "h1", "shell": H1, "area_mm2": 1_000_000.0},
+                {"id": "h3", "shell": H3, "area_mm2": 250_000.0},
+                {"id": "ho", "shell": H_OUT, "area_mm2": 1_000_000.0},
+            ],
+        }
+    )
+
+
+def test_two_part_slab_gives_one_input_per_part_with_own_area_and_holes() -> None:
+    main, second = cad_slab.slab_inputs(two_part_extras(), {})
+    assert (main.id, second.id) == ("slab", "slab-2")
+    assert main.shell == SHELL and second.shell == PART_B
+    assert (main.area_mm2, second.area_mm2) == (24_000_000.0, 9_000_000.0)
+    # Отверстие вне частей уходит к основной части.
+    assert [shell for shell, _area in main.holes] == [H1, H_OUT]
+    assert [shell for shell, _area in second.holes] == [H3]
+    assert main.net_area_mm2 == pytest.approx(22_000_000.0)
+    assert second.net_area_mm2 == pytest.approx(8_750_000.0)
+
+
+def test_two_part_slab_with_main_part_second_keeps_slab_id_on_the_main_part() -> None:
+    main, other = cad_slab.slab_inputs(two_part_extras(main_first=False), {})
+    assert (main.id, main.shell) == ("slab", SHELL)
+    assert (other.id, other.shell) == ("slab-1", PART_B)
+    ids = calc.slab_ids(two_part_extras(main_first=False).slab)
+    assert sorted(ids) == ["slab", "slab-1"]
+
+
+def test_slab_ids_for_old_and_single_part_files() -> None:
+    assert calc.slab_ids(None) == []
+    assert calc.slab_ids(extras().slab) == ["slab"]
+    assert calc.slab_ids(two_part_extras().slab) == ["slab", "slab-2"]
+
+
+def test_disabled_hole_of_the_second_part_is_not_subtracted() -> None:
+    keys = hole_keys(two_part_extras())
+    main, second = cad_slab.slab_inputs(two_part_extras(), {keys[1]: False})
+    assert second.holes == [] and second.net_area_mm2 == pytest.approx(9_000_000.0)
+    assert len(main.holes) == 2
+
+
+def test_two_part_sheet_sums_parts_without_double_counting() -> None:
+    doc = document([construction()])
+    doc.heights.slab_thickness_mm = 200
+    doc.heights.slab_status = "assumption"
+    slabs = cad_slab.slab_inputs(two_part_extras(), {})
+    result = calc.compute_sheet(doc, {}, NO_LEVELS, None, slabs)
+    assert [c.id for c in result.constructions] == ["c1", "slab", "slab-2"]
+    assert result.summary.total_count == 3
+    areas = [c.computed.area_m2 for c in result.constructions[1:]]
+    assert areas == [22.0, 8.75]
+    (group,) = [t for t in result.totals if t.kind == "floor_slab"]
+    # 33 м2 площадь частей минус три включённых отверстия (1 + 0,25 + 1) = 30,75 м2.
+    assert group.count == 2 and group.area_m2 == pytest.approx(30.75)
+    assert group.volume_m3 == pytest.approx(30.75 * 0.2)
+
+
+def test_extra_slab_part_takes_props_of_the_main_slab_until_it_has_its_own() -> None:
+    doc = document([construction()])
+    doc.heights.slab_thickness_mm = None
+    slabs = cad_slab.slab_inputs(two_part_extras(), {})
+    main_props = (
+        CadConstructionProps(thickness_override_mm=250, material="monolith_concrete"),
+        True,
+    )
+    result = calc.compute_sheet(doc, {"slab": main_props}, NO_LEVELS, None, slabs)
+    main, second = result.constructions[1:]
+    # Параметры наследуются, принятие - нет: каждую часть плиты принимает человек отдельно.
+    assert main.accepted is True and second.accepted is False
+    assert second.props.thickness_override_mm == 250
+    assert second.material.value == "monolith_concrete"
+    assert second.computed.volume_m3 == pytest.approx(8.75 * 0.25)
+    # Свои параметры части важнее параметров основной.
+    own = (CadConstructionProps(thickness_override_mm=300), False)
+    result = calc.compute_sheet(doc, {"slab": main_props, "slab-2": own}, NO_LEVELS, None, slabs)
+    main, second = result.constructions[1:]
+    assert main.computed.thickness_mm == 250.0 and second.computed.thickness_mm == 300.0
+    assert second.accepted is False and second.material.value is None

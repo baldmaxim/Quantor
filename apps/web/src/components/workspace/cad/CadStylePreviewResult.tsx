@@ -7,6 +7,8 @@ import {
   NO_SIGNATURE_HINT,
   STATUS_TEXT,
   areaText,
+  hatchColorCss,
+  hatchSignatureText,
   sampleOrdinal,
   type StylePreview,
   type StyleSample,
@@ -79,6 +81,32 @@ export const CadStylePreviewResultView: FC<IProps> = ({ result, preview, samples
                   `${preview.classes.monolith.fills} заливок, ${areaText(preview.classes.monolith.area_m2)}`,
                 )}
               </p>
+              {preview.classes.monolith.hatch_signatures !== undefined &&
+                preview.classes.monolith.hatch_signatures.length > 0 && (
+                  <div data-testid="style-hatch-signatures">
+                    <p>
+                      Штриховка монолита: {preview.classes.monolith.hatch_signatures.length}{' '}
+                      подп.
+                      {preview.classes.monolith.hatch_segments !== undefined &&
+                        `, ${preview.classes.monolith.hatch_segments} отрезков`}
+                    </p>
+                    <ul className="flex flex-col gap-[var(--s-1)]">
+                      {preview.classes.monolith.hatch_signatures.map((item, index) => (
+                        <li
+                          key={`${hatchSignatureText(item)}:${index}`}
+                          className="flex min-w-0 items-center gap-[var(--s-2)]"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-3 w-3 shrink-0 rounded-sm border border-border-strong"
+                            style={{ background: hatchColorCss(item.color) }}
+                          />
+                          <span className="[overflow-wrap:anywhere]">{hatchSignatureText(item)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               <p>
                 {grayClass(
                   'Шахты',
@@ -122,6 +150,21 @@ export const CadStylePreviewResultView: FC<IProps> = ({ result, preview, samples
                 {preview.rejected_samples.map((item, index) => (
                   <li key={`${item.reason}:${index}`} className="[overflow-wrap:anywhere]">
                     {rejectedLabel(item.sample, samples)}: {rejectReasonText(item.reason)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {preview.outline_only_samples !== undefined && preview.outline_only_samples.length > 0 && (
+            <section className={LIST} aria-label="Шахты только контуром">
+              <h4 className="text-xs font-medium">
+                Шахты только контуром: {preview.outline_only_samples.length} — профиль по ним не
+                меняется
+              </h4>
+              <ul className="flex flex-col gap-[var(--s-1)]">
+                {preview.outline_only_samples.map((item, index) => (
+                  <li key={`${item.reason}:${index}`} className="[overflow-wrap:anywhere]">
+                    {rejectedLabel(item.sample, samples)}
                   </li>
                 ))}
               </ul>

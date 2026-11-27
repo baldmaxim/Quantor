@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 from typing import Any, Final, Self
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -93,10 +94,17 @@ class TenderHubClient:
         return [TenderBrief.model_validate(row) for row in rows if isinstance(row, dict)]
 
     async def get_tender(self, tender_id: str) -> TenderBrief:
+        # id приходит от клиента и попадает в путь: «/», «..», «?» и «#» увели бы запрос
+        # на другой адрес TenderHUB, а псевдоним id завёл бы второй объект на тот же тендер.
+        if tender_id in ("", ".", "..") or quote(tender_id, safe="") != tender_id:
+            raise DomainError(ErrorCode.TENDERHUB_TENDER_NOT_FOUND)
         payload = await self._get(TENDER_OVERVIEW.format(tender_id=tender_id))
         if not isinstance(payload, dict):
             raise DomainError(ErrorCode.TENDERHUB_UNAVAILABLE, "Ответ TenderHUB не разобран")
-        return TenderBrief.model_validate(payload)
+        tender = TenderBrief.model_validate(payload)
+        if tender.id != tender_id:
+            raise DomainError(ErrorCode.TENDERHUB_TENDER_NOT_FOUND)
+        return tender
 
     async def _get(self, path: str, *, params: dict[str, str] | None = None) -> Any:
         try:
