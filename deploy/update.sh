@@ -21,7 +21,13 @@ TAG="${1:-$(cat RELEASE 2>/dev/null || true)}"
 [ -n "$TAG" ] || { echo "Укажите выпуск: ./update.sh <git-sha>"; exit 1; }
 export IMAGE_TAG="$TAG"
 
-COMPOSE=(docker compose -p quantor)
+COMPOSE=(docker compose -p quantor -f docker-compose.yml)
+# Пилотные настройки api, worker и cad-worker (пилоты обводки, ИИ-петли и автопайплайна, ADR-0055)
+# живут в compose.pilot.ui.yml рядом со скриптом: без него каждая выкладка их сбрасывала бы.
+if [ "${QUANTOR_PILOT_OVERLAY:-1}" = 1 ] && [ -f compose.pilot.ui.yml ]; then
+  COMPOSE+=(-f compose.pilot.ui.yml)
+  echo "→ пилотные настройки: compose.pilot.ui.yml"
+fi
 
 echo "→ выкатывается ${TAG}"
 # Сначала только образ API: из него берётся docker-compose.yml этого выпуска. Остальные

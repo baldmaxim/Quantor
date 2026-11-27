@@ -177,8 +177,8 @@ ssh -o LogLevel=ERROR "$SSH_HOST" "set -e; cd $REMOTE_DIR; \
   h=\$(docker create $REG/quantor-api:$SHA true); docker cp \$h:/app/deploy/update.sh update.sh; \
   docker rm -f \$h >/dev/null; SKIP_PULL=1 bash ./update.sh $SHA"
 
-# update.sh поднимает сервисы только из docker-compose.yml и сбрасывает пилотные настройки cad-worker и
-# api (пилоты проверок обводки и ИИ-петли, ADR-0055, нужны обоим: api решает доступность, cad-worker исполняет).
+# Новый update.sh сам подключает compose.pilot.ui.yml; шаг оставлен для серверной копии update.sh
+# старше этой правки (она поднимала сервисы только из docker-compose.yml и сбрасывала пилоты ADR-0055).
 if [ "${QUANTOR_PILOT_OVERLAY:-1}" = 1 ]; then
   remote "cd $REMOTE_DIR; if [ -f compose.pilot.ui.yml ]; then \
     ./compose.sh -f docker-compose.yml -f compose.pilot.ui.yml up -d --no-deps cad-worker api worker >/dev/null \
